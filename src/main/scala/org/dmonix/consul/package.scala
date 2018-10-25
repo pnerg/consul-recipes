@@ -13,4 +13,6 @@ package object consul {
   case class Session(name:String, lockDelay:Option[Int] = None, node:Option[String] = None, behavior:Option[String] = None, ttl:Option[Int] = None)
 
   case class KeyValue(createIndex:Int, modifyIndex:Int, lockIndex:Int, key:String, value:Option[String], session:Option[String])
+  
+  case class SetKeyValue(key:String, value:Option[String], compareAndSet:Option[Int] = None, acquire:Option[SessionID] = None, release:Option[SessionID] = None)
 }

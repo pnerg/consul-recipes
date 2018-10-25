@@ -30,6 +30,16 @@ trait Consul {
   def destroySession(sessionID:SessionID):Try[Unit]
 
   /**
+    * Attempts to store a value on the provided key
+    * @param key The full path of the key, e.g foo/bar/my-config
+    * @param value The value to store on the key
+    * @return
+    */
+  def storeKeyValue(key:String, value:String):Try[Boolean] = storeKeyValue(SetKeyValue(key, Option(value)))
+  
+  def storeKeyValue(kv:SetKeyValue):Try[Boolean] 
+  
+  /**
     * Blocks and waits for provided key to changed value.  
     * This is done by waiting until the ''ModifyIndex'' on the key has gone passed the provided ''modifyIndex''.  
     * If the provided index is lower than what is represented in Consul this function returns immediately.
@@ -76,10 +86,21 @@ private[consul] class ConsulImpl(httpSender:HttpSender) extends Consul {
       .put(s"/session/destroy/$sessionID")
       .asUnit
 
-
+  override def storeKeyValue(kv:SetKeyValue):Try[Boolean] = {
+    val params = Seq(
+      kv.compareAndSet.map("cas="+_),
+      kv.acquire.map("acquire="+_),
+      kv.release.map("release="+_)
+    ).flatten.mkString("?", "&", "")
+    
+    httpSender
+      .put(s"/kv/${kv.key}"+params, kv.value)
+      .map(_.toBoolean)
+  }
+  
   override def readKeyValueWhenChanged(key:String, modifyIndex:Int, maxWait:FiniteDuration):Try[Option[KeyValue]] =
     httpSender
-      .get(s"/kv/$key??index=$modifyIndex&wait=${maxWait.toSeconds}s")
+      .get(s"/kv/$key?index=$modifyIndex&wait=${maxWait.toSeconds}s")
       .map(_.flatMap{
         _.parseJson match {
           case JsArray(data) => data.headOption.mapTo[KeyValue]
