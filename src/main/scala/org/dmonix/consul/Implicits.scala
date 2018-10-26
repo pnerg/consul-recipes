@@ -3,12 +3,17 @@ package org.dmonix.consul
 import spray.json._
 
 import scala.collection.immutable.List
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 /**
   * @author Peter Nerg
   */
 object Implicits {
+  
+  implicit class  RichFuture[T](t:Future[Try[T]]) {
+    def flatten(implicit ec:ExecutionContext):Future[T] = t.map(_.get)
+  }
 
   implicit class RichJSOption(value: Option[JsValue]) {
     def convertTo[T: JsonReader](default: => T):T =
