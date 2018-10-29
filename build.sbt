@@ -12,6 +12,7 @@ scalacOptions := Seq("-feature",
     "-unchecked",
     "-deprecation",
     "-encoding", "utf8")
+
 libraryDependencies ++= Seq(
   "io.spray" %%  "spray-json"  % "1.3.4"
 )

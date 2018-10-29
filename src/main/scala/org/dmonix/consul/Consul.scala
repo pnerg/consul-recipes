@@ -30,6 +30,13 @@ trait Consul {
   def destroySession(sessionID:SessionID):Try[Unit]
 
   /**
+    * Attempts to renew a session in Consul.
+    * @param sessionID The session to renew
+    * @return Session data
+    */
+  def renewSession(sessionID:SessionID):Try[Session]
+  
+  /**
     * Attempts to store a value on the provided key
     * @param key The full path of the key, e.g foo/bar/my-config
     * @param value The value to store on the key
@@ -72,11 +79,10 @@ object Consul {
 private[consul] class ConsulImpl(httpSender:HttpSender) extends Consul {
   import ConsulJsonProtocol._
   import Implicits._
-
   
   override def createSession(session:Session):Try[SessionID] =
     httpSender
-      .put("/session/create")
+      .put("/session/create") //TODO add session data to body
       .asJson
       .map(_.fieldValOrFail[String]("ID"))
 
@@ -85,6 +91,14 @@ private[consul] class ConsulImpl(httpSender:HttpSender) extends Consul {
     httpSender
       .put(s"/session/destroy/$sessionID")
       .asUnit
+
+
+  override def renewSession(sessionID:SessionID):Try[Session] =
+    httpSender
+      .put(s"/session/renew/$sessionID")
+      .map(_.parseJson)
+      .map(_.convertTo[Session])
+  
 
   override def storeKeyValue(kv:SetKeyValue):Try[Boolean] = {
     val params = Seq(

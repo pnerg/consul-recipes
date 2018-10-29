@@ -1,5 +1,7 @@
 package org.dmonix
 
+import scala.concurrent.duration.{Duration, FiniteDuration}
+
 /**
   * @author Peter Nerg
   */
@@ -10,7 +12,7 @@ package object consul {
   
   case class ConsulHost(host:String, port:Int = 8500)
   
-  case class Session(name:String, lockDelay:Option[Int] = None, node:Option[String] = None, behavior:Option[String] = None, ttl:Option[Int] = None)
+  case class Session(name:Option[String] = None, lockDelay:Option[FiniteDuration] = None, node:Option[String] = None, behavior:Option[String] = None, ttl:Option[FiniteDuration] = None)
 
   case class KeyValue(createIndex:Int, modifyIndex:Int, lockIndex:Int, key:String, value:Option[String], session:Option[String])
   

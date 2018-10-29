@@ -1,7 +1,6 @@
 package org.dmonix.consul
 
-import spray.json.JsValue
-
+import scala.concurrent.duration.DurationInt
 import scala.util.{Success, Try}
 
 /**
@@ -9,6 +8,9 @@ import scala.util.{Success, Try}
   * @author Peter Nerg
   */
 object LeaderElection {
+  
+  private[consul] val sessionTTL = 10.seconds
+  
   /**
     * Create a candidate for leader election
     * @param consulHost Consul host
@@ -17,10 +19,12 @@ object LeaderElection {
     * @param observer Optional observer to receive election updates
     * @return
     */
-  def joinLeaderElection(consulHost: ConsulHost, groupName:String, info: Option[JsValue] = None, observer:Option[ElectionObserver] = None): Try[Candidate] = {
-    val consul = Consul(consulHost)
-    consul.createSession(Session(groupName)).map { sessionID =>
-      new CandidateImpl(consul, new ConsulHttpSender(consulHost), groupName, sessionID, info, observer)
+  def joinLeaderElection(consulHost: ConsulHost, groupName:String, info: Option[String] = None, observer:Option[ElectionObserver] = None): Try[Candidate] = {
+    val sender = new ConsulHttpSender(consulHost)
+    val consul = new ConsulImpl(sender) with SessionUpdater
+    consul.createSession(Session(name = Option(groupName), ttl = Option(sessionTTL))).map { sessionID =>
+      consul.registerSession(sessionID, sessionTTL)
+      new CandidateImpl(consul, groupName, sessionID, info, observer)
     }
   }
 }
@@ -60,16 +64,17 @@ trait Candidate {
 }
 
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.DurationInt
-import Implicits._
+import org.dmonix.consul.Implicits._
 
-private class CandidateImpl(consul:Consul, httpSender:HttpSender, groupName:String, sessionID:SessionID, info: Option[JsValue], observer:Option[ElectionObserver]) extends Candidate {
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+
+private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String, sessionID:SessionID, info: Option[String], observer:Option[ElectionObserver]) extends Candidate {
   
   private val setKey = SetKeyValue(
     key = s"leader-election/$groupName",
-    value = info.map(_.prettyPrint),
+    value = info,
     acquire = Option(sessionID)
   )
   
@@ -87,6 +92,7 @@ private class CandidateImpl(consul:Consul, httpSender:HttpSender, groupName:Stri
     val deleteKey = setKey.copy(acquire = None, release = Option(sessionID))
     consul.storeKeyValue(deleteKey) //release the ownership, we do this even if we don't own the key doesn't matter
     consul.destroySession(sessionID) //delete our session
+    consul.unregisterSession(sessionID)
     if(isLeaderState) 
       notifyUnElected()
     isLeaderState = false
