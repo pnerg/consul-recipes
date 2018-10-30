@@ -13,8 +13,13 @@ scalacOptions := Seq("-feature",
     "-deprecation",
     "-encoding", "utf8")
 
+val specs_core_ver = "3.8.4-scalaz-7.1"
 libraryDependencies ++= Seq(
-  "io.spray" %%  "spray-json"  % "1.3.4"
+    "io.spray" %%  "spray-json"  % "1.3.4", 
+    "org.specs2" %% "specs2-core" % specs_core_ver % "test",
+    "org.specs2" %% "specs2-mock" % specs_core_ver % "test", 
+    "org.specs2" %% "specs2-junit" % specs_core_ver % "test",
+    "org.specs2" %% "specs2-matcher-extra" % specs_core_ver % "test"
 )
 
 //----------------------------

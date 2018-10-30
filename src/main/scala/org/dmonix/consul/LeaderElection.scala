@@ -21,7 +21,7 @@ object LeaderElection {
     */
   def joinLeaderElection(consulHost: ConsulHost, groupName:String, info: Option[String] = None, observer:Option[ElectionObserver] = None): Try[Candidate] = {
     val sender = new ConsulHttpSender(consulHost)
-    val consul = new ConsulImpl(sender) with SessionUpdater
+    val consul = new Consul(sender) with SessionUpdater
     consul.createSession(Session(name = Option(groupName), ttl = Option(sessionTTL))).map { sessionID =>
       consul.registerSession(sessionID, sessionTTL)
       new CandidateImpl(consul, groupName, sessionID, info, observer)
