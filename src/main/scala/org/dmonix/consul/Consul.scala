@@ -55,27 +55,46 @@ class Consul(httpSender:HttpSender) {
     * Attempts to renew a session in Consul.
     * @param sessionID The session to renew
     * @return The session data
-    */  def renewSession(sessionID:SessionID):Try[Session] =
+    */  
+  def renewSession(sessionID:SessionID):Try[Session] =
     httpSender
       .put(s"/session/renew/$sessionID")
       .map(_.parseJson)
       .map(_.convertTo[Session])
 
   /**
-    * Attempts to store a value on the provided key
+    * Attempts to store a value on the provided key.  
+    * This function will always write to the key irrespective if there is an owning session.  
     * @param key The full path of the key, e.g foo/bar/my-config
-    * @param value The value to store on the key
-    * @return
+    * @param value The optional value to store on the key
+    * @return ''Success'' if managed to access Consul, then true id the key/value was set 
     */
-  def storeKeyValue(key:String, value:String):Try[Boolean] = storeKeyValue(SetKeyValue(key, Option(value)))
+  def storeKeyValue(key:String, value:Option[String]):Try[Boolean] = storeKeyValue(SetKeyValue(key = key, value = value))
 
+  /**
+    * Attempts to store a value on the provided key only if the key did not previously exist.  
+    * @param key The full path of the key, e.g foo/bar/my-config
+    * @param value The optional value to store on the key
+    * @return ''Success'' if managed to access Consul, then true id the key/value was set 
+    */
+  def storeKeyValueIfNotSet(key:String, value:Option[String]):Try[Boolean] = storeKeyValue(SetKeyValue(key = key, value = value, compareAndSet = Some(0)))
+
+  /**
+    * Attempts to store a value on the provided key.  
+    * The exact behavior of the storage operation is determined by the values set on the provided ''SetKeyValue''
+    * @param kv The key value data
+    * @return ''Success'' if managed to access Consul, then true id the key/value was set 
+    */
   def storeKeyValue(kv:SetKeyValue):Try[Boolean] = {
     val params = Seq(
       kv.compareAndSet.map("cas="+_),
       kv.acquire.map("acquire="+_),
       kv.release.map("release="+_)
-    ).flatten.mkString("?", "&", "")
-    
+    ).flatten match {
+      case Nil => "" //empty seq => empty string, .mkstring would else always add '?' even if the seq is empty
+      case seq => seq.mkString("?", "&", "")
+    } 
+
     httpSender
       .put(s"/kv/${kv.key}"+params, kv.value)
       .map(_.toBoolean)
@@ -96,7 +115,7 @@ class Consul(httpSender:HttpSender) {
     * @param key The full path of the key, e.g foo/bar/my-config
     * @param modifyIndex The modification index value to block on
     * @param maxWait Max wait time
-    * @return
+    * @return ''Success'' if managed to access Consul, then ''Some'' if the value was found, ''None'' else
     */
   def readKeyValueWhenChanged(key:String, modifyIndex:Int, maxWait:FiniteDuration):Try[Option[KeyValue]] =
     httpSender
