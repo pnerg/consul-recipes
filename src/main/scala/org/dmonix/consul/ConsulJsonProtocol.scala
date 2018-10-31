@@ -48,10 +48,10 @@ object ConsulJsonProtocol extends DefaultJsonProtocol {
     override def read(json: JsValue): Session = {
       Session(
         name = json.fieldVal[String]("Name").filter(nonEmptyString),
-        lockDelay = None, //TODO implement
+        lockDelay = json.fieldVal[FiniteDuration]("LockDelay"),
         node = json.fieldVal[String]("Node").filter(nonEmptyString),
         behavior = json.fieldVal[String]("Behavior").filter(nonEmptyString),
-        ttl = None//TODO implement
+        ttl = json.fieldVal[FiniteDuration]("TTL")
       )
     }
   }
