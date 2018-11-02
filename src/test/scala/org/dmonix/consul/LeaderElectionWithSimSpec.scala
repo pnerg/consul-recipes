@@ -15,7 +15,6 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
   private def consulHost:ConsulHost = consulSim.consulHost.get
   //private def consulHost:ConsulHost =ConsulHost("localhost", 8500)
 
-  /*
   "Single member election" >> {
     val observer = new TestObserver()
     lazy val candidate = LeaderElection.joinLeaderElection(consulHost, "single-member", None, Some(observer)).get
@@ -24,7 +23,6 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
     candidate.leave()
     ok
   }
-  */
 
   "Multi member election" >> {
     val groupName = "multi-group"
