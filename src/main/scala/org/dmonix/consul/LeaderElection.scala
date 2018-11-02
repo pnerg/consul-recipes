@@ -1,7 +1,9 @@
 package org.dmonix.consul
 
+import org.slf4j.LoggerFactory
+
 import scala.concurrent.duration.DurationInt
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Factory for creating candidates for leader election
@@ -69,8 +71,10 @@ import org.dmonix.consul.Implicits._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import org.slf4j.Logger
 
 private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String, sessionID:SessionID, info: Option[String], observer:Option[ElectionObserver]) extends Candidate {
+  private val logger = LoggerFactory.getLogger(classOf[Candidate])
   
   private val setKey = SetKeyValue(
     key = s"leader-election/$groupName",
@@ -83,19 +87,21 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   private var isLeaderState = attemptToTakeLeadership() //immediately try to cease leadership
   private var modifyIndex = 0
 
-  override def isLeader: Boolean = isLeaderState
-  
+  logger.info(s"Session [$sessionID] joined leader election for group [$groupName], initial leader state is [$isLeaderState]")
+
   waitForElectionUpdate()
+
+  override def isLeader: Boolean = isLeaderState
 
   override def leave(): Unit = {
     isActive = false
-    val deleteKey = setKey.copy(acquire = None, release = Option(sessionID))
-    consul.storeKeyValue(deleteKey) //release the ownership, we do this even if we don't own the key doesn't matter
+    consul.storeKeyValue(setKey.copy(acquire = None, release = Option(sessionID), value = None)) //release the ownership, we do this even if we don't own the key doesn't matter
     consul.destroySession(sessionID) //delete our session
     consul.unregisterSession(sessionID)
     if(isLeaderState) 
       notifyUnElected()
     isLeaderState = false
+    logger.info(s"Session [$sessionID] has left the election group [$groupName]")
   }
 
   private def attemptToTakeLeadership():Boolean = {
@@ -114,14 +120,14 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   }
   
   private def waitForElectionUpdate():Unit = {
-    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex, waitDuration))
+    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration))
       .flatten
       .filter(_ => isActive) //fail the Future in case we're no longer active
       .onComplete {
         //successful response from Consul with a key
         case Success(Some(keyValue)) =>
           modifyIndex = keyValue.modifyIndex
-          
+          logger.debug(s"Session [$sessionID] has read updated election data [$keyValue] and is in leader state [$isLeaderState]")
           keyValue.session match {
             //election node has no owner, fight for ownership
             //current owner yielded or the owning session was terminated  
@@ -140,15 +146,25 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
             case _ =>
           }
           waitForElectionUpdate()
-          
+        case Success(None) => //got no data, file has been removed
+          //FIXME what to do in case the key is removed
         //future/try failed...do a new get on the key again
-        case _ if isActive =>
+        case Failure(ex) if isActive =>
+          logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}]")
+          ex.printStackTrace()
           waitForElectionUpdate()
         //future failed du to the 'filter' where we decided we're no longer active, just ignore and exit  
         case _ if !isActive =>
       }
   }
   
-  private def notifyElected():Unit = observer.foreach(_.elected())
-  private def notifyUnElected():Unit = observer.foreach(_.unElected())
+  private def notifyElected():Unit = {
+    logger.info(s"Session [$sessionID] has acquired leadership in group [$groupName]")
+    observer.foreach(_.elected())
+  }
+  
+  private def notifyUnElected():Unit = {
+    logger.info(s"Session [$sessionID] has lost leadership in group [$groupName]")
+    observer.foreach(_.unElected())
+  }
 }

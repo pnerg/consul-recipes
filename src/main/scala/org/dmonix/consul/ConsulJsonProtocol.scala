@@ -2,12 +2,11 @@ package org.dmonix.consul
 
 import java.util.Base64
 
+import org.dmonix.consul.Implicits._
 import spray.json._
 
 import scala.collection.immutable.ListMap
-import Implicits._
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 
 /**
   * @author Peter Nerg
@@ -21,16 +20,9 @@ object ConsulJsonProtocol extends DefaultJsonProtocol {
     */
   implicit object FiniteDurationFormat extends RootJsonFormat[FiniteDuration] {
 
-    override def write(obj: FiniteDuration): JsValue = {
-      JsString(obj.toSeconds+"s")
-    }
+    override def write(obj: FiniteDuration): JsValue = JsString(obj.toSeconds+"s")
 
-    override def read(json: JsValue): FiniteDuration = {
-      Duration(json.convertTo[String]) match {
-        case d:FiniteDuration => d
-        case _ => deserializationError(s"The string [${json.convertTo[String]}] is not a valid FiniteDuration")
-      }
-    }
+    override def read(json: JsValue): FiniteDuration = json.convertTo[String].asFiniteDuration
   }
   
   implicit object SessionFormat extends RootJsonFormat[Session] {
@@ -57,10 +49,21 @@ object ConsulJsonProtocol extends DefaultJsonProtocol {
   }
 
   implicit object KeyValueFormat extends RootJsonFormat[KeyValue] {
-    override def write(obj: KeyValue): JsValue = serializationError("Serialization of [KeyValue] is not supported")
+    val charset = "UTF-8"
+    def encode(s:String):String = new String(Base64.getEncoder.encode(s.getBytes(charset)), charset)
+    override def write(obj: KeyValue): JsValue = {
+      val builder = ListMap.newBuilder[String, JsValue]
+      builder += "CreateIndex" -> obj.createIndex.toJson
+      builder += "ModifyIndex" -> obj.modifyIndex.toJson
+      builder += "LockIndex" -> obj.lockIndex.toJson
+      builder += "Key" -> obj.key.toJson
+      obj.value.map(encode).foreach(builder += "Value" -> _.toJson)
+      obj.session.foreach(builder += "Session" -> _.toJson)
+      JsObject(builder.result())
+    }
 
     override def read(json: JsValue): KeyValue = {
-      def decode(s:String):String = new String(Base64.getDecoder.decode(s), "UTF-8") 
+      def decode(s:String):String = new String(Base64.getDecoder.decode(s), charset) 
       KeyValue(
         createIndex = json.fieldValOrFail[Int]("CreateIndex"),
         modifyIndex = json.fieldValOrFail[Int]("ModifyIndex"),

@@ -3,6 +3,7 @@ package org.dmonix.consul
 import spray.json._
 
 import scala.collection.immutable.List
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -10,6 +11,17 @@ import scala.util.{Failure, Success, Try}
   * @author Peter Nerg
   */
 object Implicits {
+  
+  implicit class RichString(s:String) {
+    /**
+      * Attempts to parse a ''FiniteDuration'' out of the string
+      * @return
+      */
+    def asFiniteDuration = Duration(s) match {
+      case d:FiniteDuration => d
+      case _ => deserializationError(s"The string [$s}] is not a valid FiniteDuration")
+    }
+  }
   
   implicit class  RichFuture[T](t:Future[Try[T]]) {
     def flatten(implicit ec:ExecutionContext):Future[T] = t.map(_.get)

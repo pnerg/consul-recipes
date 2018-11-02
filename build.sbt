@@ -15,11 +15,14 @@ scalacOptions := Seq("-feature",
 
 val specs_core_ver = "3.8.4-scalaz-7.1"
 libraryDependencies ++= Seq(
-    "io.spray" %%  "spray-json"  % "1.3.4", 
+    "io.spray" %%  "spray-json"  % "1.3.4",
+    "org.slf4j" % "slf4j-api" % "1.7.25",
     "org.specs2" %% "specs2-core" % specs_core_ver % "test",
     "org.specs2" %% "specs2-mock" % specs_core_ver % "test", 
     "org.specs2" %% "specs2-junit" % specs_core_ver % "test",
-    "org.specs2" %% "specs2-matcher-extra" % specs_core_ver % "test"
+    "org.specs2" %% "specs2-matcher-extra" % specs_core_ver % "test",
+    "com.typesafe.akka" %% "akka-http" % "10.0.11" % "test",
+    "ch.qos.logback" % "logback-classic" % "1.2.3" % "test"
 )
 
 //----------------------------
