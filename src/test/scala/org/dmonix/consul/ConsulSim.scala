@@ -2,7 +2,7 @@ package org.dmonix.consul
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{Semaphore, TimeUnit}
+import java.util.concurrent.{Semaphore => jSemaphore, TimeUnit}
 
 import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
@@ -32,7 +32,7 @@ class ConsulSim {
   private val logger = LoggerFactory.getLogger(classOf[ConsulSim])
   private val zeroDuration = 0.seconds
   private val defaultDuration = 5.seconds
-  private case class Blocker(index:Int, semaphore: Semaphore) {
+  private case class Blocker(index:Int, semaphore: jSemaphore) {
     def releaseIfIndexReached(mi:Int):Unit = if(mi >= index)semaphore.release()
   }
 
@@ -167,7 +167,7 @@ class ConsulSim {
       if(index <= kv.modifyIndex) 
         Some(kv)
       else {
-        val semaphore = new Semaphore(0)
+        val semaphore = new java.util.concurrent.Semaphore(0)
         val blocker = Seq(Blocker(index, semaphore))
         val seq = blockers.get(kv.key) map(_ ++ blocker) getOrElse blocker
         blockers.put(kv.key, seq)
