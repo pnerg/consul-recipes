@@ -7,6 +7,7 @@ import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
 private[consul] trait HttpSender {
+  def delete(path:String):Try[String]
   def put(path:String, body:Option[String] = None):Try[String]
   def get(path:String):Try[Option[String]]
 }
@@ -16,6 +17,15 @@ private[consul] class ConsulHttpSender(consulHost: ConsulHost) extends HttpSende
     def responseAsString:String = Source.fromInputStream(con.getInputStream).mkString
   }
   private val consulURL = s"http://${consulHost.host}:${consulHost.port}"
+  def delete(path:String):Try[String] =
+    send(path, "DELETE", None)
+      .flatMap { req =>
+        req.getResponseCode match {
+          case it if 200 until 203 contains it => Success(req.responseAsString)
+          case code => Failure(new IOException(s"Got unexpected response [$code][${req.getResponseMessage}]"))
+        }
+      }
+
   def put(path:String, body:Option[String] = None):Try[String] =
     send(path, "PUT", body)
       .flatMap { req =>

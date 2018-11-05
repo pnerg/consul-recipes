@@ -120,7 +120,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   }
   
   private def waitForElectionUpdate():Unit = {
-    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration))
+    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration)) //+1 to modifyIndex to block on the next value
       .flatten
       .filter(_ => isActive) //fail the Future in case we're no longer active
       .onComplete {
@@ -148,6 +148,8 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
           waitForElectionUpdate()
         case Success(None) => //got no data, file has been removed
           //FIXME what to do in case the key is removed
+          isLeaderState = attemptToTakeLeadership()
+          waitForElectionUpdate()
         //future/try failed...do a new get on the key again
         case Failure(ex) if isActive =>
           logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}]")

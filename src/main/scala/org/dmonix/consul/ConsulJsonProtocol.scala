@@ -74,4 +74,21 @@ object ConsulJsonProtocol extends DefaultJsonProtocol {
       )
     }
   }
+
+
+  implicit object SemaphoreDataFormat extends RootJsonFormat[SemaphoreData] {
+    override def write(obj: SemaphoreData): JsValue = {
+      val builder = ListMap.newBuilder[String, JsValue]
+      builder += "Permits" -> obj.permits.toJson
+      builder += "Holders" -> obj.holders.toJson
+      JsObject(builder.result())
+    }
+
+    override def read(json: JsValue): SemaphoreData = {
+      SemaphoreData(
+        permits = json.fieldValOrFail[Int]("Permits"),
+        holders = json.fieldValOrFail[Set[SessionID]]("Holders")
+      )
+    }
+  }
 }

@@ -9,7 +9,7 @@ trait MockResponses {
   import ConsulJsonProtocol._
   
   def failureResponse = Failure(new IOException(s"Got unexpected response [666][Shit hit the fan"))
-  def getKVResponse(data:Option[String] = None) = ???//Success(new KeyValue())
+  def getKVResponse(data:Option[String] = None) = ??? //Success(new KeyValue())
   def trueResponse = Success("true")
   def falseResponse = Success("false")
   def sessionCreatedJson(sessionID:String = "12345") =  s"""
@@ -40,4 +40,5 @@ class MockHttpSenderImpl(putResponse: PartialFunction[(String, Option[String]), 
   private def noMatch[T](path:String) = (_:Any) => Failure[T](new MatchError(s"Request data for the URI [$path] did not match provided function"))
   def put(path:String, body:Option[String]):Try[String] = putResponse.applyOrElse((path, body), noMatch(path))
   def get(path:String):Try[Option[String]] = getResponse.applyOrElse(path, noMatch(path))
+  def delete(path:String):Try[String] = ??? 
 }

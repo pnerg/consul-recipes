@@ -50,7 +50,6 @@ class Consul(httpSender:HttpSender) {
       .put(s"/session/destroy/$sessionID")
       .asUnit
 
-
   /**
     * Attempts to renew a session in Consul.
     * @param sessionID The session to renew
@@ -127,4 +126,28 @@ class Consul(httpSender:HttpSender) {
         }
       })
 
+  /**
+    * Deletes the provided key
+    * This function is idempotent, i.e. it will not fail even if the key does not exist
+    * @param key The key to remove
+    * @return ''Success'' if managed to access Consul, then normally 'true'
+    */
+  def deleteKeyValue(key:String):Try[Boolean] = deleteKeyValue(DeleteKeyValue(key = key))
+
+  /**
+    * Deletes the provided key
+    * This function is idempotent, i.e. it will not fail even if the key does not exist
+    * @param kv The key to remove
+    * @return ''Success'' if managed to access Consul, then normally 'true'
+    */
+  def deleteKeyValue(kv: DeleteKeyValue):Try[Boolean] = {
+    val params = Seq(
+      kv.compareAndSet.map("cas="+_),
+      Some("recurse="+kv.recursive)
+    ).mkString("?", "&", "")
+
+    httpSender
+      .delete("/kv/"+kv.key+params)
+      .map(_.toBoolean)
+  }
 }

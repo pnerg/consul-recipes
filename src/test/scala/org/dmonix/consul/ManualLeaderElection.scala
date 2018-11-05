@@ -1,15 +1,13 @@
 package org.dmonix.consul
 
-import java.util.concurrent.Semaphore
-
 /**
   * Simple app to illustrate the leadership election process.   
   * Start multiple instances to have more candidates for the election process.  
-  * Requires Consul to be litening to localhost:8500 (see README.md for example to start Consul)
+  * Requires Consul to be listening to localhost:8500 (see README.md for example to start Consul)
   * @author Peter Nerg
   */
 object ManualLeaderElection extends App {
-  private val semaphore = new Semaphore(0)
+  private val semaphore = new java.util.concurrent.Semaphore(0)
   
   //simple observer that just prints election changes
   private val observer = new ElectionObserver {
