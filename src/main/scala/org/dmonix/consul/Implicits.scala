@@ -94,6 +94,15 @@ object Implicits {
     def asUnit():Try[Unit] = t.map(_ => ())
   }
 
-
+  implicit class RichOptionMap(map:Map[String, Option[Any]]) {
+    /**
+      * Converts the MAp of Option string tuples (name,value) into a URL param string (''?foo=bar&arg=2''
+      * @return String with the params, empty string if empty list or all items are None
+      */
+    def asURLParams:String = map.toSeq.map(t => t._2.map(t._1+"="+_)).flatten match {
+      case Nil => "" //empty seq => empty string, .mkstring would else always add '?' even if the seq is empty
+      case seq => seq.mkString("?", "&", "")
+    }
+  }
 
 }

@@ -85,14 +85,11 @@ class Consul(httpSender:HttpSender) {
     * @return ''Success'' if managed to access Consul, then true id the key/value was set 
     */
   def storeKeyValue(kv:SetKeyValue):Try[Boolean] = {
-    val params = Seq(
-      kv.compareAndSet.map("cas="+_),
-      kv.acquire.map("acquire="+_),
-      kv.release.map("release="+_)
-    ).flatten match {
-      case Nil => "" //empty seq => empty string, .mkstring would else always add '?' even if the seq is empty
-      case seq => seq.mkString("?", "&", "")
-    } 
+    val params = Map(
+      "cas" -> kv.compareAndSet,
+      "acquire" -> kv.acquire,
+      "release" -> kv.release
+    ).asURLParams
 
     httpSender
       .put(s"/kv/${kv.key}"+params, kv.value)
@@ -141,10 +138,10 @@ class Consul(httpSender:HttpSender) {
     * @return ''Success'' if managed to access Consul, then normally 'true'
     */
   def deleteKeyValue(kv: DeleteKeyValue):Try[Boolean] = {
-    val params = Seq(
-      kv.compareAndSet.map("cas="+_),
-      Some("recurse="+kv.recursive)
-    ).mkString("?", "&", "")
+    val params = Map(
+      "cas" -> kv.compareAndSet,
+      "recurse" -> Option(kv.recursive)
+    ).asURLParams
 
     httpSender
       .delete("/kv/"+kv.key+params)

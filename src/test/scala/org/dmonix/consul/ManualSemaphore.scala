@@ -1,5 +1,8 @@
 package org.dmonix.consul
 
+import scala.concurrent.duration.DurationInt
+import scala.util._
+
 /**
   * Simple app to illustrate the usage of a ''Semaphore''.   
   * Start multiple instances to have competing users to the Semaphore.  
@@ -8,17 +11,19 @@ package org.dmonix.consul
   */
 object ManualSemaphore extends App {
   private val blocker = new java.util.concurrent.Semaphore(0)
-
-  val semaphore = Semaphore(ConsulHost("localhost"), "example-semaphore", 1).get
-
-  println(semaphore.tryAcquire())
+  private val semaphore = Semaphore(ConsulHost("localhost"), "example-semaphore", 1).get
   
-  //catches shutdown of the app and makes the candidate leave the election process
+  //catches shutdown of the app and releases any potential permits
   sys.addShutdownHook {
     semaphore.release()
     blocker.release()
   }
 
+  semaphore.tryAcquire(5.minutes) match {
+    case Success(res) => println("Have a permit = "+res)
+    case Failure(ex) => ex.printStackTrace()
+  }
+  
   //hold here for the lifetime of the app
   blocker.acquire()
 

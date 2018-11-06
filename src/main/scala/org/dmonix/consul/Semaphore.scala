@@ -1,7 +1,7 @@
 package org.dmonix.consul
 
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{Deadline, DurationInt, FiniteDuration}
 import scala.util._
 import spray.json._
 import ConsulJsonProtocol._
@@ -41,11 +41,16 @@ class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semapho
   private val memberFile = semaphorePath+"/"+sessionID
   
   private case class AggregatedData(keyValue: KeyValue, semaphoreData: SemaphoreData)
-  
+
+  /**
+    * Attempts to release a permit.
+    * If this instance is not holding a permit this function call does nothing
+    * @return @return ''Success'' if managed to access Consul, then ''true'' if a permit was released.
+    */
   def release():Try[Boolean] = {
     consul
       .deleteKeyValue(memberFile) //delete our own member file
-      .flatMap(_ => readLockData) //attempt to read lock data
+      .flatMap(_ => readLockData()) //attempt to read lock data
       .flatMap{aggregatedData => 
         //only allowed to release if owner/holder of a permit
         if(aggregatedData.semaphoreData.isHolder(sessionID)) {
@@ -62,33 +67,79 @@ class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semapho
         //not an owner/holder of a permit
         else
           Success(false)
-      }
-  }
-  
-  def tryAcquire():Try[Boolean] = {
-    writeOwnMemberFile() //always write our own member/holder file
-        .flatMap(_ => readLockData) //try to read the lock data
-        .flatMap{ aggregatedData =>
-          //if already a holder, return true
-          if(aggregatedData.semaphoreData.isHolder(sessionID)) Success(true)
-          //if there's enough permits left, try to take them
-          else if(aggregatedData.semaphoreData.hasPermits) {
-            //create new data with decreased permits and ourselves as holder
-            val newData = aggregatedData.semaphoreData.decreasePermits().addHolder(sessionID)
-            //attempt to write the updated lock data
-            storeLockData(newData, aggregatedData.keyValue.modifyIndex)
-              .flatMap{
-                //data written, we got the lock/semaphore
-                case true => Success(true)
-                //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
-                case false => tryAcquire()
-              }
-          }
-          //not enough permits left, bail out  
-          else Success(false)
-        }
+      }.map{res =>
+      //TODO where to remove the session? Can't be done here as it would be impossible to acquire a permit again
+//        consul.unregisterSession(sessionID)
+//        consul.destroySession(sessionID)
+        res
     }
-  
+  }
+
+  /**
+    * Attempts to acquire a permit without blocking.  
+    * If this instance is already holding a permit no further permits are taken
+    * @return ''Success'' if managed to access Consul, then ''true'' if a permit was acquired.
+    */
+  def tryAcquire():Try[Boolean] = tryAcquireInternal().map(_._1)
+
+  /**
+    * Attempts to acquire a permit blocking if necessary.
+    * If this instance is already holding a permit no further permits are taken
+    * In practice this invokes 
+    * {{{
+    * tryAcquire(Deadline.now + maxWait) 
+    * }}}
+    * @param maxWait The maximum time to block for a permit
+    * @return ''Success'' if managed to access Consul, then ''true'' if a permit was acquired.
+    */
+  def tryAcquire(maxWait:FiniteDuration):Try[Boolean] = tryAcquire(Deadline.now + maxWait)
+
+  /**
+    * Attempts to acquire a permit blocking if necessary.
+    * If this instance is already holding a permit no further permits are taken
+    * @param deadline The deadline for when to give up blocking for a permit
+    * @return ''Success'' if managed to access Consul, then true if a permit was acquired.
+    */
+  def tryAcquire(deadline: Deadline):Try[Boolean] = {
+    //there's still time left to do attempts
+    if(deadline.hasTimeLeft()) {
+      tryAcquireInternal().flatMap {
+        //got the lock, return
+        case (true, _) => Success(true)
+        //did not get the lock, block on the lock file and try again  
+        case (false, aggregatedData) => readLockData(aggregatedData.keyValue.modifyIndex, deadline.timeLeft).flatMap( _ => tryAcquire(deadline))
+      }
+    }
+    //we've reached the max wait time, bail out  
+    else {
+      Success(false)
+    }
+  }
+
+  private def tryAcquireInternal():Try[(Boolean, AggregatedData)] = {
+    writeOwnMemberFile() //always write our own member/holder file
+      .flatMap(_ => readLockData()) //try to read the lock data
+      .flatMap{ aggregatedData =>
+      //if already a holder, return true
+      if(aggregatedData.semaphoreData.isHolder(sessionID)) Success((true, aggregatedData))
+      //if there's enough permits left, try to take them
+      else if(aggregatedData.semaphoreData.hasPermits) {
+        //create new data with decreased permits and ourselves as holder
+        val newData = aggregatedData.semaphoreData.decreasePermits().addHolder(sessionID)
+        //attempt to write the updated lock data
+        storeLockData(newData, aggregatedData.keyValue.modifyIndex)
+          .flatMap{
+            //data written, we got the lock/semaphore
+            case true => Success((true, aggregatedData))
+            //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
+            case false => tryAcquireInternal()
+          }
+      }
+      //not enough permits left, bail out  
+      else Success((false, aggregatedData))
+    }
+  }
+
   private def writeOwnMemberFile():Try[Unit] = 
     consul
       .storeKeyValue(SetKeyValue(key = memberFile, acquire = Some(sessionID))) //attempt to write own 'member' file
@@ -102,9 +153,9 @@ class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semapho
     consul
       .storeKeyValue(SetKeyValue(key = lockFile, compareAndSet = Some(modifyIndex), value = Some(semaphoreData.toJson.prettyPrint)))
   
-  private def readLockData:Try[AggregatedData] = 
+  private def readLockData(modifyIndex:Int = 0, maxWait:FiniteDuration = Consul.zeroDuration):Try[AggregatedData] = 
     consul
-      .readKeyValue(lockFile)
+      .readKeyValueWhenChanged(lockFile, modifyIndex, maxWait)
       .flatMap{ 
         case Some(kv) => kv.value.map(_.parseJson.convertTo[SemaphoreData]) match {
           case Some(data) => Success(AggregatedData(kv, data))
