@@ -19,7 +19,7 @@ object Implicits {
       */
     def asFiniteDuration = Duration(s) match {
       case d:FiniteDuration => d
-      case _ => deserializationError(s"The string [$s}] is not a valid FiniteDuration")
+      case _ => deserializationError(s"The string [$s] is not a valid FiniteDuration")
     }
   }
   
@@ -93,13 +93,17 @@ object Implicits {
     
     def asUnit():Try[Unit] = t.map(_ => ())
   }
+  
+  implicit class RichOption[T](o:Option[T]) {
+    def asTry():Try[T] = o.map(Success(_)) getOrElse(Failure(new NoSuchElementException("Empty Option")))
+  }
 
   implicit class RichOptionMap(map:Map[String, Option[Any]]) {
     /**
-      * Converts the MAp of Option string tuples (name,value) into a URL param string (''?foo=bar&arg=2''
+      * Converts the Map of key/Option into a URL param string (''?foo=bar&arg=2''
       * @return String with the params, empty string if empty list or all items are None
       */
-    def asURLParams:String = map.toSeq.map(t => t._2.map(t._1+"="+_)).flatten match {
+    def asURLParams:String = map.collect{case (key, Some(value)) => key+"="+value} match {
       case Nil => "" //empty seq => empty string, .mkstring would else always add '?' even if the seq is empty
       case seq => seq.mkString("?", "&", "")
     }

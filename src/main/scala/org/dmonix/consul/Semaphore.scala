@@ -5,6 +5,9 @@ import scala.concurrent.duration.{Deadline, DurationInt, FiniteDuration}
 import scala.util._
 import spray.json._
 import ConsulJsonProtocol._
+import org.dmonix.consul.Semaphore.sessionTTL
+import org.slf4j.LoggerFactory
+import Implicits._
 
 object Semaphore {
   private[consul] val sessionTTL = 10.seconds
@@ -20,14 +23,11 @@ object Semaphore {
     val sender = new ConsulHttpSender(consulHost)
     val consul = new Consul(sender) with SessionUpdater
     val semaphorePath = "semaphores/"+semaphoreName
-    
-    def lockData(sessionID:SessionID):String = SemaphoreData(initialPermits, Set.empty).toJson.prettyPrint
-    
-    for {
-      sessionID <- consul.createSession(Session(name = Option(semaphoreName), ttl = Option(sessionTTL))) //create the sessionID
-      _ <- consul.storeKeyValueIfNotSet(lockFile(semaphorePath), Some(lockData(sessionID))) //attempt to create the .lock file if it doesn't exist
-    } yield new Semaphore(consul, sessionID, semaphorePath)
-    
+    val lockData = SemaphoreData(initialPermits, Set.empty).toJson.prettyPrint
+
+    consul
+      .storeKeyValueIfNotSet(lockFile(semaphorePath), Some(lockData))
+      .map(_ => new Semaphore(consul, semaphoreName))
   }
   
   private def lockFile(path:String) = path + "/.lock"
@@ -36,10 +36,13 @@ object Semaphore {
 /**
   * @author Peter Nerg
   */
-class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semaphorePath:String) {
+class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
+  private val logger = LoggerFactory.getLogger(classOf[Semaphore])
+
+  private val semaphorePath = "semaphores/"+semaphoreName
   private val lockFile = Semaphore.lockFile(semaphorePath)
-  private val memberFile = semaphorePath+"/"+sessionID
   
+  private var sessionIDOpt:Option[SessionID] = None
   private case class AggregatedData(keyValue: KeyValue, semaphoreData: SemaphoreData)
 
   /**
@@ -48,30 +51,36 @@ class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semapho
     * @return @return ''Success'' if managed to access Consul, then ''true'' if a permit was released.
     */
   def release():Try[Boolean] = {
-    consul
-      .deleteKeyValue(memberFile) //delete our own member file
-      .flatMap(_ => readLockData()) //attempt to read lock data
-      .flatMap{aggregatedData => 
-        //only allowed to release if owner/holder of a permit
-        if(aggregatedData.semaphoreData.isHolder(sessionID)) {
-          //attempt to write back lock data with the added permits
-          val newData = aggregatedData.semaphoreData.increasePermits().removeHolder(sessionID)
-          storeLockData(newData, aggregatedData.keyValue.modifyIndex)
-            .flatMap {
-              //lock successfully updated
-              case true => Success(true)
-              //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
-              case false => release()
-            }
-        }
-        //not an owner/holder of a permit
-        else
-          Success(false)
-      }.map{res =>
-      //TODO where to remove the session? Can't be done here as it would be impossible to acquire a permit again
-//        consul.unregisterSession(sessionID)
-//        consul.destroySession(sessionID)
-        res
+    sessionIDOpt match {
+      case Some(sessionID) =>
+        (for {
+          _ <- consul.deleteKeyValue(memberFile(sessionID))
+          aggregatedData <- readLockData()
+          _ <- consul.destroySession(sessionID)
+        } yield {
+          consul.unregisterSession(sessionID)
+          //only allowed to release if owner/holder of a permit
+          println(aggregatedData)
+          if(aggregatedData.semaphoreData.isHolder(sessionID)) {
+            //attempt to write back lock data with the added permits
+            val newData = aggregatedData.semaphoreData.increasePermits().removeHolder(sessionID)
+            storeLockData(newData, aggregatedData.keyValue.modifyIndex)
+              .flatMap {
+                //lock successfully updated
+                case true =>
+                  logger.debug(s"[$sessionID] successfully released permit for [$semaphoreName]")
+                  Success(true)
+                //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
+                case false =>
+                  logger.debug(s"[$sessionID] failed to release permit for [$semaphoreName] due to concurrent write, will try again")
+                  release()
+              }
+          }
+          //not an owner/holder of a permit
+          else
+            Success(false)
+        }).flatten
+      case None => Success(false)
     }
   }
 
@@ -106,53 +115,78 @@ class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semapho
       tryAcquireInternal().flatMap {
         //got the lock, return
         case (true, _) => Success(true)
-        //did not get the lock, block on the lock file and try again  
-        case (false, aggregatedData) => readLockData(aggregatedData.keyValue.modifyIndex, deadline.timeLeft).flatMap( _ => tryAcquire(deadline))
+        //did not get the lock, block on the lock file and try again
+        //the readLockData returns if the lockData file has changed or the waitTime expires  
+        case (false, aggregatedData) if deadline.hasTimeLeft => readLockData(aggregatedData.keyValue.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
+        //didn't get lock and we're passed the deadline, bail out
+        case (false, _) =>
+          logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
+          Success(false)
       }
     }
     //we've reached the max wait time, bail out  
     else {
+      logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
       Success(false)
     }
   }
 
   private def tryAcquireInternal():Try[(Boolean, AggregatedData)] = {
-    writeOwnMemberFile() //always write our own member/holder file
-      .flatMap(_ => readLockData()) //try to read the lock data
-      .flatMap{ aggregatedData =>
+    (for {
+      sessionID <- getOrCreateSession()
+      _ <- writeOwnMemberFile(sessionID) //always write our own member/holder file
+      aggregatedData <- readLockData()  //try to read the lock data
+    } yield {
       //if already a holder, return true
-      if(aggregatedData.semaphoreData.isHolder(sessionID)) Success((true, aggregatedData))
+      if(aggregatedData.semaphoreData.isHolder(sessionID)) {
+        Success((true, aggregatedData))
+      }
       //if there's enough permits left, try to take them
       else if(aggregatedData.semaphoreData.hasPermits) {
         //create new data with decreased permits and ourselves as holder
         val newData = aggregatedData.semaphoreData.decreasePermits().addHolder(sessionID)
         //attempt to write the updated lock data
+        logger.debug(s"[$sessionID] attempts to acquire permit for [$semaphoreName] with [$newData]")
         storeLockData(newData, aggregatedData.keyValue.modifyIndex)
           .flatMap{
             //data written, we got the lock/semaphore
-            case true => Success((true, aggregatedData))
+            case true =>
+              logger.debug(s"[$sessionID] successfully acquired permit for [$semaphoreName]")
+              Success((true, aggregatedData))
             //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
-            case false => tryAcquireInternal()
+            case false =>
+              logger.debug(s"[$sessionID] failed to write lock data for [$semaphoreName] due to concurrent changes, will try again")
+              tryAcquireInternal()
           }
       }
       //not enough permits left, bail out  
-      else Success((false, aggregatedData))
-    }
+      else {
+        logger.debug(s"[$sessionID] could not acquire permit to [$semaphoreName] due to lack of permits")
+        Success((false, aggregatedData))
+      } 
+    }).flatten
   }
 
-  private def writeOwnMemberFile():Try[Unit] = 
+  private def writeOwnMemberFile(sessionID: SessionID):Try[Unit] = {
     consul
-      .storeKeyValue(SetKeyValue(key = memberFile, acquire = Some(sessionID))) //attempt to write own 'member' file
+      .storeKeyValue(SetKeyValue(key = memberFile(sessionID), acquire = Some(sessionID))) //attempt to write own 'member' file
       .flatMap {
         case true => Success(())
         //should really not happen as we use our own sessionID as key
         case false => Failure(new IllegalStateException(s"Failed to create path [${semaphorePath+"/"+sessionID}] cannot join in Semaphore group"))
-      }
+    }
+  }
   
   private def storeLockData(semaphoreData: SemaphoreData, modifyIndex:Int):Try[Boolean] = 
     consul
       .storeKeyValue(SetKeyValue(key = lockFile, compareAndSet = Some(modifyIndex), value = Some(semaphoreData.toJson.prettyPrint)))
-  
+
+  /**
+    * Attempts to the read the ''.lock'' file for the Semaphore 
+    * @param modifyIndex Optional ModifyIndex, used if blocking for change on the file
+    * @param maxWait Optional waitTime, used with the modifyIndex when blocking for a change
+    * @return 
+    */
   private def readLockData(modifyIndex:Int = 0, maxWait:FiniteDuration = Consul.zeroDuration):Try[AggregatedData] = 
     consul
       .readKeyValueWhenChanged(lockFile, modifyIndex, maxWait)
@@ -163,4 +197,19 @@ class Semaphore(consul:Consul with SessionUpdater, sessionID: SessionID, semapho
          }
         case None => Failure(new IllegalStateException(s"The path [$lockFile] no longer exists"))
       }
+  
+  private def getOrCreateSession():Try[SessionID] =
+    sessionIDOpt.asTry
+        .recoverWith { case _ =>
+          consul.createSession(Session(name = Option(semaphoreName), ttl = Option(sessionTTL))) match {
+            case Success(sessionID) =>
+              sessionIDOpt = Some(sessionID)
+              consul.registerSession(sessionID, sessionTTL)
+              logger.debug(s"Created session [$sessionID] for [$semaphoreName]")
+              Success(sessionID)
+            case f@Failure(_) => f
+          }
+        }
+  
+  private def memberFile(sessionID: SessionID):String = semaphorePath + "/" +sessionID
 }

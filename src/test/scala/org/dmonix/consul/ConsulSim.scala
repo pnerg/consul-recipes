@@ -2,7 +2,7 @@ package org.dmonix.consul
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{Semaphore => jSemaphore, TimeUnit}
+import java.util.concurrent.{Executors, TimeUnit, Semaphore => jSemaphore}
 
 import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
@@ -18,7 +18,7 @@ import spray.json._
 
 import scala.collection._
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 object ConsulSim  {
   def apply() = new ConsulSim()
 }
@@ -42,6 +42,7 @@ class ConsulSim {
 
   private var server: Option[ServerBinding] = None
 
+  private val sessionCounter = new AtomicInteger(0)
   private val creationCounter = new AtomicInteger(0)
   private val modificationCounter = new AtomicInteger(0)
   
@@ -62,7 +63,8 @@ class ConsulSim {
       //create session
       pathPrefix("create") {
         put {
-          val sessionID = UUID.randomUUID().toString
+//          val sessionID = UUID.randomUUID().toString
+          val sessionID = "session-"+sessionCounter.incrementAndGet()
            val rsp = s"""
               |{
               | "ID": "$sessionID"
@@ -90,9 +92,14 @@ class ConsulSim {
         }
       }
     } ~
+      /**
+        * ==============================
+        * v1/kv
+        * ==============================
+        */
     pathPrefix("v1" / "kv" / Remaining) { key =>
       put {
-        parameters('cas?, 'acquire.?, 'release.?) { (cas, acquire, release) =>
+        parameters('cas ?, 'acquire.?, 'release.?) { (cas, acquire, release) =>
           entity(as[Option[String]]) { entity =>
             (acquire, release) match {
               case (Some(id1), Some(id2)) => //both acquire and release are provided => illegal
@@ -102,26 +109,39 @@ class ConsulSim {
               case (None, Some(id)) if !sessionExists(id) => //release session does not exist
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
               case _ =>
-                val kv = keyValues.getOrElse(key, KeyValue(createIndex = nextCreationIndex, modifyIndex = 0, lockIndex = 0, key = key, session = None, value = entity.filterNot(_.isEmpty)))
-              val result = attemptSetKey(kv, cas.map(_.toInt), acquire, release)
+                val newValue = entity.filterNot(_.isEmpty)
+                val kv = keyValues
+                  .get(key)
+                  .map(_.copy(value = newValue))
+                  .getOrElse(KeyValue(createIndex = nextCreationIndex, modifyIndex = 0, lockIndex = 0, key = key, session = None, value = newValue))
+                val result = attemptSetKey(kv, cas.map(_.toInt), acquire, release)
                 complete(HttpEntity(ContentTypes.`application/json`, result.toString))
             }
           }
         }
       } ~
-      get {
-        parameters('index?, 'wait.?) { (index, wait) =>
-          val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
-          val modifyIndex = index.map(_.toInt) getOrElse 0
-          readKey(key, modifyIndex, waitDuration) match {
-            case Some(kv) =>
-              complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
-            case None =>
-              complete(StatusCodes.NotFound, s"No such key '$key'")
+        get {
+          parameters('index ?, 'wait.?) { (index, wait) =>
+            val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
+            val modifyIndex = index.map(_.toInt) getOrElse 0
+            readKey(key, modifyIndex, waitDuration) match {
+              case Some(kv) =>
+                complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
+              case None =>
+                complete(StatusCodes.NotFound, s"No such key '$key'")
+            }
+          }
+        } ~
+        delete {
+          parameters('cas ?, 'recurse.?) { (cas, recurse) =>
+            val recursive = recurse getOrElse false //TODO implement recursive delete
+            keyValues.remove(key).foreach{kv =>
+              blockers.get(kv.key).foreach(_.foreach(_.semaphore.release()))
+            }
+            complete(HttpEntity(ContentTypes.`application/json`, "true"))
           }
         }
-      }
-    }  
+    }
 
   private def nextCreationIndex =  creationCounter.getAndIncrement()
   private def nextModificationIndex =  modificationCounter.getAndIncrement()
@@ -171,6 +191,7 @@ class ConsulSim {
         val blocker = Seq(Blocker(index, semaphore))
         val seq = blockers.get(kv.key) map(_ ++ blocker) getOrElse blocker
         blockers.put(kv.key, seq)
+        logger.debug(s"Found key [$key] but index is [${kv.modifyIndex}], adding blocker on index [$index] with wait [${wait.toSeconds}]s")
         //hold here until the time runs out of someone updates the key
         semaphore.tryAcquire(wait.toMillis, TimeUnit.MILLISECONDS) 
         readKey(key, 0, zeroDuration)

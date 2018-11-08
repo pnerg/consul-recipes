@@ -11,9 +11,9 @@ import scala.concurrent.duration.FiniteDuration
 /**
   * @author Peter Nerg
   */
-object ConsulJsonProtocol extends DefaultJsonProtocol {
+private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
   
-  private def nonEmptyString(s:String):Boolean = !s.isEmpty
+  private def nonEmptyString(s:String):Boolean = Option(s).map(!_.isEmpty) getOrElse false
 
   /**
     * Formater to convert ''FiniteDuration'' to/from Json
