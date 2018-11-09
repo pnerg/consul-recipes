@@ -1,8 +1,7 @@
 package org.dmonix.consul
 
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{Executors, TimeUnit, Semaphore => jSemaphore}
+import java.util.concurrent.{TimeUnit, Semaphore => jSemaphore}
 
 import akka.actor.{ActorSystem, Terminated}
 import akka.http.scaladsl.Http
@@ -18,7 +17,7 @@ import spray.json._
 
 import scala.collection._
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, Future}
 object ConsulSim  {
   def apply() = new ConsulSim()
 }

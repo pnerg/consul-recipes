@@ -20,7 +20,8 @@ object ManualSemaphore extends App {
   }
 
   semaphore.tryAcquire(5.minutes) match {
-    case Success(res) => println("Have a permit = "+res)
+    case Success(true) => println("Yay, got a permit!")
+    case Success(false) => println("Didn't get a permit...:(")
     case Failure(ex) => ex.printStackTrace()
   }
   

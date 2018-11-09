@@ -55,12 +55,11 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       case Some(sessionID) =>
         (for {
           _ <- consul.deleteKeyValue(memberFile(sessionID))
-          aggregatedData <- readLockData()
           _ <- consul.destroySession(sessionID)
+          _ <- Try(consul.unregisterSession(sessionID))
+          aggregatedData <- readLockData()
         } yield {
-          consul.unregisterSession(sessionID)
           //only allowed to release if owner/holder of a permit
-          println(aggregatedData)
           if(aggregatedData.semaphoreData.isHolder(sessionID)) {
             //attempt to write back lock data with the added permits
             val newData = aggregatedData.semaphoreData.increasePermits().removeHolder(sessionID)
@@ -80,6 +79,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
           else
             Success(false)
         }).flatten
+      //don't even have a session, cannot be permit holder
       case None => Success(false)
     }
   }
@@ -134,7 +134,6 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   private def tryAcquireInternal():Try[(Boolean, AggregatedData)] = {
     (for {
       sessionID <- getOrCreateSession()
-      _ <- writeOwnMemberFile(sessionID) //always write our own member/holder file
       aggregatedData <- readLockData()  //try to read the lock data
     } yield {
       //if already a holder, return true
@@ -152,7 +151,8 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
             //data written, we got the lock/semaphore
             case true =>
               logger.debug(s"[$sessionID] successfully acquired permit for [$semaphoreName]")
-              Success((true, aggregatedData))
+              writeOwnMemberFile(sessionID) //as we acquired the lock we must write our own member/lockholder file
+                .map(_ => (true, aggregatedData)) //map/return the result of the permit acquire
             //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
             case false =>
               logger.debug(s"[$sessionID] failed to write lock data for [$semaphoreName] due to concurrent changes, will try again")
@@ -165,6 +165,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         Success((false, aggregatedData))
       } 
     }).flatten
+      
   }
 
   private def writeOwnMemberFile(sessionID: SessionID):Try[Unit] = {

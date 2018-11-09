@@ -21,7 +21,7 @@ object Consul {
 
 import org.dmonix.consul.Consul._
 /**
-  * Encapsulates functions for communication towards Consul.
+  * Encapsulates functions towards Consul.
   * @author Peter Nerg
   */
 class Consul(httpSender:HttpSender) {
