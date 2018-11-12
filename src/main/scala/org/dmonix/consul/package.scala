@@ -11,10 +11,12 @@ package object consul {
 
   case class ConsulHost(host:String, port:Int = 8500)
   
-  case class Session(name:Option[String] = None, lockDelay:Option[FiniteDuration] = None, node:Option[String] = None, behavior:Option[String] = None, ttl:Option[FiniteDuration] = None, data:Option[String] = None)
+  case class Session(name:Option[String] = None, lockDelay:Option[FiniteDuration] = None, node:Option[String] = None, behavior:Option[String] = None, ttl:Option[FiniteDuration] = None)
 
   case class KeyValue(createIndex:Int, modifyIndex:Int, lockIndex:Int, key:String, value:Option[String], session:Option[String])
 
+  case class GetKeyValue(key:String, modififyIndex:Option[Int] = None, maxWait:Option[FiniteDuration] = None, recursive:Boolean = false)
+  
   /**
     * Data for setting a key/value
     * @param key The name/path of the key (e.g. foo/bar/my-data)
@@ -34,8 +36,8 @@ package object consul {
   case class DeleteKeyValue(key:String, compareAndSet:Option[Int] = None, recursive:Boolean = false)
   
   private[consul] case class SemaphoreData(permits:Int, holders:Set[SessionID]) {
-    def decreasePermits():SemaphoreData = copy(permits = permits - 1)
-    def increasePermits():SemaphoreData = copy(permits = permits + 1)
+    def decreasePermits(p:Int = 1):SemaphoreData = copy(permits = permits - p)
+    def increasePermits(p:Int = 1):SemaphoreData = copy(permits = permits + p)
     def addHolder(sessionID: SessionID):SemaphoreData = copy(holders = holders + sessionID)
     def removeHolder(sessionID: SessionID): SemaphoreData = copy(holders = holders.filterNot(_ == sessionID))
     def hasPermits():Boolean = permits > 0

@@ -15,11 +15,11 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
   "Creating a session" >> {
     "shall be successful if a valid response is provided" >> {
       val sender = mockPut {
-        case ("/session/create", None) => sessionCreatedResponse("12345")
+        case ("/session/create", _) => sessionCreatedResponse("12345")
       }
       
       val consul = new Consul(sender)
-      consul.createSession(Session(name=Option("test"))) must beASuccessfulTry
+      consul.createSession(Session(name=Option("test"))) must beASuccessfulTry("12345")
     }
     
     "shall be a failure if a non-valid response is provided" >> {

@@ -120,12 +120,19 @@ class ConsulSim {
         }
       } ~
         get {
-          parameters('index ?, 'wait.?) { (index, wait) =>
+          parameters('index ?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
             val modifyIndex = index.map(_.toInt) getOrElse 0
+            
             readKey(key, modifyIndex, waitDuration) match {
-              case Some(kv) =>
+              //non-recursive call return the found key
+              case Some(kv) if recurse.isEmpty => 
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
+              //recursive call, return all keys on the requested path
+              case Some(kv) => 
+                val res = keyValues.filterKeys(_.startsWith(key)).values.toSeq
+                complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
+              //no such key
               case None =>
                 complete(StatusCodes.NotFound, s"No such key '$key'")
             }

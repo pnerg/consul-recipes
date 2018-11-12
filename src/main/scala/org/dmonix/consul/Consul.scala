@@ -16,7 +16,10 @@ object Consul {
     * @param consulHost
     * @return
     */
-  def apply(consulHost: ConsulHost):Consul = new Consul(new ConsulHttpSender(consulHost)) 
+  def apply(consulHost: ConsulHost):Consul = new Consul(new ConsulHttpSender(consulHost))
+  private[consul] implicit class RichSearchResult(t:Try[Option[Stream[KeyValue]]]) {
+    def firstKeyOpt:Try[Option[KeyValue]] = t.map(_.flatMap(_.headOption))
+  }
 }
 
 import org.dmonix.consul.Consul._
@@ -27,7 +30,8 @@ import org.dmonix.consul.Consul._
 class Consul(httpSender:HttpSender) {
   import ConsulJsonProtocol._
   import Implicits._
-
+  
+  
   /**
     * Attempts to create a session in Consul.
     * @param session Data to store on the session
@@ -35,7 +39,7 @@ class Consul(httpSender:HttpSender) {
     */
   def createSession(session:Session):Try[SessionID] =
     httpSender
-      .put("/session/create", session.data)
+      .put("/session/create", Some(session.toJson.prettyPrint))
       .asJson
       .map(_.fieldValOrFail[String]("ID"))
 
@@ -101,8 +105,15 @@ class Consul(httpSender:HttpSender) {
     * @param key The full path of the key, e.g foo/bar/my-config
     * @return ''Success'' if managed to access Consul, then ''Some'' if the value was found, ''None'' else
     */
-  def readKeyValue(key:String):Try[Option[KeyValue]] = readKeyValueWhenChanged(key, 0, zeroDuration)
+  def readKeyValue(key:String):Try[Option[KeyValue]] = readKeyValues(GetKeyValue(key)).firstKeyOpt
 
+  /**
+    * Attempts to recursively read the key/values for the provided key path
+    * @param key The path to query
+    * @return ''Success'' if managed to access Consul, then ''Some'' if the key was found followed by the stream of key/values matching the query
+    */
+  def readKeyValueRecursive(key:String):Try[Option[Stream[KeyValue]]] = readKeyValues(GetKeyValue(key, None, None, true))
+  
   /**
     * Blocks and waits for provided key to changed value.  
     * This is done by waiting until the ''ModifyIndex'' on the key has gone passed the provided ''modifyIndex''.  
@@ -113,15 +124,30 @@ class Consul(httpSender:HttpSender) {
     * @param maxWait Max wait time
     * @return ''Success'' if managed to access Consul, then ''Some'' if the value was found, ''None'' else
     */
-  def readKeyValueWhenChanged(key:String, modifyIndex:Int, maxWait:FiniteDuration):Try[Option[KeyValue]] =
+  def readKeyValueWhenChanged(key:String, modifyIndex:Int, maxWait:FiniteDuration):Try[Option[KeyValue]] = readKeyValues(GetKeyValue(key, Some(modifyIndex), Option(maxWait))).firstKeyOpt
+
+  /**
+    * Attempts to read the key/value(s) as specified by the provided data.
+    * The result is a stream since if ''recursive'' is requested then there could be more than one key returned
+    * @param kv The key to query
+    * @return ''Success'' if managed to access Consul, then ''Some'' if the key was found followed by the stream of key/values matching the query
+    */
+  def readKeyValues(kv: GetKeyValue):Try[Option[Stream[KeyValue]]] = {
+    val params = Map(
+      "index" -> kv.modififyIndex,
+      "wait" -> kv.maxWait.map(_.toMillis+"ms"),
+      "recurse" -> (if(kv.recursive) Some(true) else None)
+    ).asURLParams
+
     httpSender
-      .get(s"/kv/$key?index=$modifyIndex&wait=${maxWait.toSeconds}s")
-      .map(_.flatMap{
+      .get(s"/kv/"+kv.key+params)
+      .map(_.map{
         _.parseJson match {
-          case JsArray(data) => data.headOption.mapTo[KeyValue]
-          case _ => deserializationError(s"Got unexpected response for key [$key]")
+          case JsArray(data) => data.toStream.map(_.convertTo[KeyValue])
+          case _ => deserializationError(s"Got unexpected response for key [${kv.key}]")
         }
       })
+  }
 
   /**
     * Deletes the provided key
@@ -147,4 +173,5 @@ class Consul(httpSender:HttpSender) {
       .delete("/kv/"+kv.key+params)
       .map(_.toBoolean)
   }
+  
 }

@@ -36,8 +36,7 @@ class ConsulJsonProtocolSpec extends Specification {
       lockDelay = Some(69.seconds),
       node = Some("some-node"),
       behavior = Some("release"),
-      ttl = Some(69.minutes),
-      data = None
+      ttl = Some(69.minutes)
     )
     val json =
       """ 
