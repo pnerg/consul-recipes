@@ -38,9 +38,9 @@ trait MockHttpSender {
       | "ID": "$sessionID"
       |} 
     """.stripMargin)
-  def mockGet(pf: GetResponseFunc): HttpSender = new MockHttpSenderImpl(notImplemented, pf, notImplemented)
-  def mockPut(pf: PutResponseFunc): HttpSender = new MockHttpSenderImpl(pf, notImplemented, notImplemented)
-  def mockDelete(pf: DeleteResponseFunc): HttpSender = new MockHttpSenderImpl(notImplemented, notImplemented, pf)
+  def mockGet(pf: GetResponseFunc): HttpSender = new MockHttpSenderImpl(notImplemented, notImplemented, notImplemented).withMockGet(pf)
+  def mockPut(pf: PutResponseFunc): HttpSender = new MockHttpSenderImpl(notImplemented, notImplemented, notImplemented).withMockPut(pf)
+  def mockDelete(pf: DeleteResponseFunc): HttpSender = new MockHttpSenderImpl(notImplemented, notImplemented, notImplemented).withMockDelete(pf)
 }
 
 /**
@@ -51,4 +51,8 @@ class MockHttpSenderImpl(putResponse: PutResponseFunc, getResponse: GetResponseF
   def put(path:String, body:Option[String]):Try[String] = putResponse.applyOrElse((path, body), noMatch(path))
   def get(path:String):Try[Option[String]] = getResponse.applyOrElse(path, noMatch(path))
   def delete(path:String):Try[String] = deleteResponse.applyOrElse(path, noMatch(path))
+  
+  def withMockGet(pf: GetResponseFunc): HttpSender = new MockHttpSenderImpl(putResponse, pf, deleteResponse)
+  def withMockPut(pf: PutResponseFunc): HttpSender = new MockHttpSenderImpl(pf, getResponse, deleteResponse)
+  def withMockDelete(pf: DeleteResponseFunc): HttpSender = new MockHttpSenderImpl(putResponse, getResponse, pf)
 }
