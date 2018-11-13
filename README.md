@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/pnerg/consul-receipes.svg?branch=master)](https://travis-ci.org/pnerg/consul-receipes) [![codecov.io](http://codecov.io/github/pnerg/consul-receipes/coverage.svg?branch=master)](http://codecov.io/github/pnerg/consul-receipes?branch=master)
+[![Build Status](https://travis-ci.org/pnerg/consul-receipes.svg?branch=master)](https://travis-ci.org/pnerg/consul-receipes) [![codecov](https://codecov.io/gh/pnerg/consul-recipes/branch/master/graph/badge.svg)](https://codecov.io/gh/pnerg/consul-recipes)
 
 # Consul Recipes
 Implements the most common "recipes" on [Consul](https://www.consul.io) such as leader election and semaphore.
