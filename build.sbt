@@ -13,7 +13,7 @@ scalacOptions := Seq("-feature",
     "-deprecation",
     "-encoding", "utf8")
 
-val specs_core_ver = "3.8.4-scalaz-7.1"
+val specs_core_ver = "4.3.4"
 libraryDependencies ++= Seq(
     "io.spray" %%  "spray-json"  % "1.3.4",
     "org.slf4j" % "slf4j-api" % "1.7.25",
