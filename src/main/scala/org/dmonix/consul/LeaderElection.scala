@@ -66,12 +66,10 @@ trait Candidate {
 }
 
 
-import org.dmonix.consul.Implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import org.slf4j.Logger
 
 private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String, sessionID:SessionID, info: Option[String], observer:Option[ElectionObserver]) extends Candidate {
   private val logger = LoggerFactory.getLogger(classOf[Candidate])
@@ -120,8 +118,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   }
   
   private def waitForElectionUpdate():Unit = {
-    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration)) //+1 to modifyIndex to block on the next value
-      .flatten
+    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration).get) //+1 to modifyIndex to block on the next value
       .filter(_ => isActive) //fail the Future in case we're no longer active
       .onComplete {
         //successful response from Consul with a key
@@ -169,4 +166,5 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
     logger.info(s"Session [$sessionID] has lost leadership in group [$groupName]")
     observer.foreach(_.unElected())
   }
+  
 }
