@@ -18,6 +18,9 @@ import spray.json._
 import scala.collection._
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
+
+
+
 object ConsulSim  {
   def apply() = new ConsulSim()
 }
@@ -63,6 +66,7 @@ class ConsulSim {
       pathPrefix("create") {
         put {
 //          val sessionID = UUID.randomUUID().toString
+          //easier to debug/trace logs with a seqential counter as sessionID generator
           val sessionID = "session-"+sessionCounter.incrementAndGet()
            val rsp = s"""
               |{
@@ -97,6 +101,7 @@ class ConsulSim {
         * ==============================
         */
     pathPrefix("v1" / "kv" / Remaining) { key =>
+      //store kv
       put {
         parameters('cas ?, 'acquire.?, 'release.?) { (cas, acquire, release) =>
           entity(as[Option[String]]) { entity =>
@@ -119,25 +124,27 @@ class ConsulSim {
           }
         }
       } ~
+      //read kv
         get {
           parameters('index ?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
             val modifyIndex = index.map(_.toInt) getOrElse 0
-            
+            logger.debug(s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]")
             readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
               case Some(kv) if recurse.isEmpty => 
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
               //recursive call, return all keys on the requested path
-              case Some(kv) => 
+              case _ if recurse.isDefined => 
                 val res = keyValues.filterKeys(_.startsWith(key)).values.toSeq
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
               //no such key
-              case None =>
+              case _ =>
                 complete(StatusCodes.NotFound, s"No such key '$key'")
             }
           }
         } ~
+      //delete kv
         delete {
           parameters('cas ?, 'recurse.?) { (cas, recurse) =>
             val recursive = recurse getOrElse false //TODO implement recursive delete

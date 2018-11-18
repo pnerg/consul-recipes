@@ -11,7 +11,14 @@ import Implicits._
 
 object Semaphore {
   private[consul] val sessionTTL = 10.seconds
-
+  private[consul] val permitFileName = ".permits"
+  private[consul] case class AggregatedData(semaphoreKeyFile: KeyValue, semaphoreData: SemaphoreData, holderFiles:Stream[KeyValue]) {
+    def staleMemberFiles:Stream[KeyValue] = holderFiles.filter(_.session.isEmpty) //all member/session files without an owner
+    def validMemberFiles:Stream[KeyValue] = holderFiles.filter(_.session.isDefined) //all member/session files with an owner
+    def validHolderIDs:Set[SessionID] = validMemberFiles.map(_.session).flatten.toSet
+    def isHolder(sessionID: SessionID):Boolean = validHolderIDs.contains(sessionID)
+  }
+  
   /**
     * Creates a Semaphore with the provided number of permits
     * @param consulHost Consul host
@@ -30,9 +37,15 @@ object Semaphore {
       .map(_ => new Semaphore(consul, semaphoreName))
   }
   
-  private def lockFile(path:String) = path + "/.lock"
+  private def lockFile(path:String) = path + "/" + permitFileName
+  private[consul] implicit class RichKeyValue(kv: KeyValue) {
+    def isPermitFile:Boolean = kv.key.endsWith(permitFileName)
+    def valueAsPermitData:Option[SemaphoreData] = kv.value.map(_.parseJson.convertTo[SemaphoreData])
+  } 
 }
 
+
+import Semaphore._
 /**
   * @author Peter Nerg
   */
@@ -40,10 +53,9 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   private val logger = LoggerFactory.getLogger(classOf[Semaphore])
 
   private val semaphorePath = "semaphores/"+semaphoreName
-  private val lockFile = Semaphore.lockFile(semaphorePath)
+  private val permitFile = Semaphore.lockFile(semaphorePath)
   
   private var sessionIDOpt:Option[SessionID] = None
-  private case class AggregatedData(keyValue: KeyValue, semaphoreData: SemaphoreData)
 
   /**
     * Attempts to release a permit.
@@ -57,13 +69,13 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
           _ <- consul.deleteKeyValue(memberFile(sessionID))
           _ <- consul.destroySession(sessionID)
           _ <- Try(consul.unregisterSession(sessionID))
-          aggregatedData <- readLockData()
+          aggregatedData <- readSemaphoreInfo()
         } yield {
           //only allowed to release if owner/holder of a permit
           if(aggregatedData.semaphoreData.isHolder(sessionID)) {
             //attempt to write back lock data with the added permits
             val newData = aggregatedData.semaphoreData.increasePermits().removeHolder(sessionID)
-            storeLockData(newData, aggregatedData.keyValue.modifyIndex)
+            storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
               .flatMap {
                 //lock successfully updated
                 case true =>
@@ -117,7 +129,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         case (true, _) => Success(true)
         //did not get the lock, block on the lock file and try again
         //the readLockData returns if the lockData file has changed or the waitTime expires  
-        case (false, aggregatedData) if deadline.hasTimeLeft => readLockData(aggregatedData.keyValue.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
+        case (false, aggregatedData) if deadline.hasTimeLeft => readSemaphoreInfo(aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
         //didn't get lock and we're passed the deadline, bail out
         case (false, _) =>
           logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
@@ -134,19 +146,21 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   private def tryAcquireInternal():Try[(Boolean, AggregatedData)] = {
     (for {
       sessionID <- getOrCreateSession()
-      aggregatedData <- readLockData()  //try to read the lock data
+      rawData <- readSemaphoreInfo()  //try to read the lock data
+      aggregatedData <- pruneStaleHolders(rawData) //prune any potential holders and return a mutated AggregatedData
     } yield {
       //if already a holder, return true
-      if(aggregatedData.semaphoreData.isHolder(sessionID)) {
+      if(aggregatedData.isHolder(sessionID)) {
+        logger.debug(s"[$sessionID] is already a holder of a permit for [$semaphoreName]")
         Success((true, aggregatedData))
       }
-      //if there's enough permits left, try to take them
+      //if there's enough permits left, try to one
       else if(aggregatedData.semaphoreData.hasPermits) {
         //create new data with decreased permits and ourselves as holder
         val newData = aggregatedData.semaphoreData.decreasePermits().addHolder(sessionID)
         //attempt to write the updated lock data
         logger.debug(s"[$sessionID] attempts to acquire permit for [$semaphoreName] with [$newData]")
-        storeLockData(newData, aggregatedData.keyValue.modifyIndex)
+        storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
           .flatMap{
             //data written, we got the lock/semaphore
             case true =>
@@ -180,24 +194,33 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   
   private def storeLockData(semaphoreData: SemaphoreData, modifyIndex:Int):Try[Boolean] = 
     consul
-      .storeKeyValue(SetKeyValue(key = lockFile, compareAndSet = Some(modifyIndex), value = Some(semaphoreData.toJson.prettyPrint)))
+      .storeKeyValue(SetKeyValue(key = permitFile, compareAndSet = Some(modifyIndex), value = Some(semaphoreData.toJson.prettyPrint)))
 
   /**
     * Attempts to the read the ''.lock'' file for the Semaphore 
     * @param modifyIndex Optional ModifyIndex, used if blocking for change on the file
     * @param maxWait Optional waitTime, used with the modifyIndex when blocking for a change
-    * @return 
+    * @return
     */
-  private def readLockData(modifyIndex:Int = 0, maxWait:FiniteDuration = Consul.zeroDuration):Try[AggregatedData] = 
-    consul
-      .readKeyValueWhenChanged(lockFile, modifyIndex, maxWait)
-      .flatMap{ 
-        case Some(kv) => kv.value.map(_.parseJson.convertTo[SemaphoreData]) match {
-          case Some(data) => Success(AggregatedData(kv, data))
-          case None => Failure(new IllegalStateException(s"The data for path [$lockFile] has been erased"))
-         }
-        case None => Failure(new IllegalStateException(s"The path [$lockFile] no longer exists"))
+  private def readSemaphoreInfo(modifyIndex:Int = 0, maxWait:FiniteDuration = Consul.zeroDuration):Try[AggregatedData] = {
+    (for{
+      semaphorePermitFile <- consul.readKeyValueWhenChanged(permitFile, modifyIndex, maxWait)
+      memberFiles <- readMemberFiles
+    } yield {
+      semaphorePermitFile match {
+        case Some(kv) => kv.valueAsPermitData match {
+          case Some(data) => Success(AggregatedData(kv, data, memberFiles))
+          case None => Failure(new IllegalStateException(s"The data for path [$permitFile] has been erased"))
+        }
+        case None => Failure(new IllegalStateException(s"The path [$permitFile] no longer exists"))
       }
+    }).flatten
+  }
+
+  private def readMemberFiles:Try[Stream[KeyValue]] = 
+    consul.readKeyValueRecursive(semaphorePath)
+      .map(_.getOrElse(Stream.empty))
+       .map(_.filterNot(_.isPermitFile))
   
   private def getOrCreateSession():Try[SessionID] =
     sessionIDOpt.asTry
@@ -213,4 +236,24 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         }
   
   private def memberFile(sessionID: SessionID):String = semaphorePath + "/" +sessionID
+
+  /**
+    * Finds if there are any stale sessions registered as holders on the ''.semaphore'' file.
+    * This is done by comparing the sessions in the file with the session files in the same directory.  
+    * Should there be a mismatch it means that an application has crashed and Consul has reaped the session filesim 
+    * @return
+    */
+  private def pruneStaleHolders(aggregatedData: AggregatedData):Try[AggregatedData] = {
+    //any member file without owner is a sign of a session that has died and orphaned the file, nuke it
+    aggregatedData.staleMemberFiles.foreach {kv =>
+      logger.warn(s"Found member file [${kv.key}] without owner for [$semaphoreName], this is the mark of a dead session will delete it")
+      consul.deleteKeyValue(kv.key)
+    }
+    val newSemData = aggregatedData.semaphoreData.increasePermits(aggregatedData.staleMemberFiles.size).copy(holders = aggregatedData.validHolderIDs)
+    println("------------------")
+    println(aggregatedData)
+    println(aggregatedData.copy(semaphoreData = newSemData))
+    println(aggregatedData.holderFiles.toList)
+    Success(aggregatedData.copy(semaphoreData = newSemData))
+  }
 }
