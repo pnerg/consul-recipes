@@ -27,8 +27,7 @@ object Semaphore {
     * @return
     */
   def apply(consulHost: ConsulHost, semaphoreName:String, initialPermits:Int):Try[Semaphore] = {
-    val sender = new ConsulHttpSender(consulHost)
-    val consul = new Consul(sender) with SessionUpdater
+    val consul = createConsul(consulHost) 
     val semaphorePath = "semaphores/"+semaphoreName
     val lockData = SemaphoreData(initialPermits, Set.empty).toJson.prettyPrint
 
@@ -41,7 +40,18 @@ object Semaphore {
   private[consul] implicit class RichKeyValue(kv: KeyValue) {
     def isPermitFile:Boolean = kv.key.endsWith(permitFileName)
     def valueAsPermitData:Option[SemaphoreData] = kv.value.map(_.parseJson.convertTo[SemaphoreData])
-  } 
+  }
+
+  /**
+    * Destroys all data stored in Consul for a Sempahore.  
+    * Purpose is to clean out stale data.
+    * @param consulHost Consul host
+    * @param semaphoreName The name to use for the Semaphore in Consul
+    * @return
+    */
+  def destroy(consulHost: ConsulHost, semaphoreName:String):Try[Boolean] = createConsul(consulHost).deleteKeyValueRecursive("semaphores/"+semaphoreName)
+
+  private def createConsul(consulHost: ConsulHost) = new Consul(new ConsulHttpSender(consulHost)) with SessionUpdater
 }
 
 
@@ -250,10 +260,6 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       consul.deleteKeyValue(kv.key)
     }
     val newSemData = aggregatedData.semaphoreData.increasePermits(aggregatedData.staleMemberFiles.size).copy(holders = aggregatedData.validHolderIDs)
-    println("------------------")
-    println(aggregatedData)
-    println(aggregatedData.copy(semaphoreData = newSemData))
-    println(aggregatedData.holderFiles.toList)
     Success(aggregatedData.copy(semaphoreData = newSemData))
   }
 }

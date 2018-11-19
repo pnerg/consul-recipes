@@ -158,6 +158,14 @@ class Consul(httpSender:HttpSender) {
   def deleteKeyValue(key:String):Try[Boolean] = deleteKeyValue(DeleteKeyValue(key = key))
 
   /**
+    * Recursively deletes the provided key and all its decedents/children.
+    * This function is idempotent, i.e. it will not fail even if the key does not exist
+    * @param key The key to remove
+    * @return ''Success'' if managed to access Consul, then normally 'true'
+    */
+  def deleteKeyValueRecursive(key:String):Try[Boolean] = deleteKeyValue(DeleteKeyValue(key = key, recursive = true))
+
+  /**
     * Deletes the provided key
     * This function is idempotent, i.e. it will not fail even if the key does not exist
     * @param kv The key to remove

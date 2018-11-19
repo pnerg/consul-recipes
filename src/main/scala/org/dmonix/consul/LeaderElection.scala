@@ -150,7 +150,6 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
         //future/try failed...do a new get on the key again
         case Failure(ex) if isActive =>
           logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}]")
-          ex.printStackTrace()
           waitForElectionUpdate()
         //future failed du to the 'filter' where we decided we're no longer active, just ignore and exit  
         case _ if !isActive =>
