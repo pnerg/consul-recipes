@@ -46,7 +46,7 @@ object Semaphore {
   }
 
   /**
-    * Destroys all data stored in Consul for a Sempahore.  
+    * Destroys all data stored in Consul for a Semaphore.  
     * Purpose is to clean out stale data.
     * @param consulHost Consul host
     * @param semaphoreName The name to use for the Semaphore in Consul
@@ -88,7 +88,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
           //only allowed to release if owner/holder of a permit
           if(aggregatedData.semaphoreData.isHolder(sessionID)) {
             //attempt to write back lock data with the added permits
-            val newData = aggregatedData.semaphoreData.increasePermits().removeHolder(sessionID)
+            val newData = aggregatedData.semaphoreData.removeHolder(sessionID)
             storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
               .flatMap {
                 //lock successfully updated
@@ -168,12 +168,12 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         logger.debug(s"[$sessionID] is already a holder of a permit for [$semaphoreName]")
         Success((true, aggregatedData))
       }
-      //if there's enough permits left, try to one
+      //if there's enough permits left, try to take one
       else if(aggregatedData.semaphoreData.hasPermits) {
-        //create new data with decreased permits and ourselves as holder
-        val newData = aggregatedData.semaphoreData.decreasePermits().addHolder(sessionID)
+        //create new data ourselves as holder
+        val newData = aggregatedData.semaphoreData.addHolder(sessionID)
         //attempt to write the updated lock data
-        logger.debug(s"[$sessionID] attempts to acquire permit for [$semaphoreName] with [$newData]")
+        logger.debug(s"[$sessionID] attempts to acquire permit for [$semaphoreName] with updated data [$newData]")
         storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
           .flatMap{
             //data written, we got the lock/semaphore
@@ -208,7 +208,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   
   private def storeLockData(semaphoreData: SemaphoreData, modifyIndex:Int):Try[Boolean] = 
     consul
-      .storeKeyValue(SetKeyValue(key = permitFile, compareAndSet = Some(modifyIndex), value = Some(semaphoreData.toJson.prettyPrint)))
+      .storeKeyValue(SetKeyValue(key = permitFile, compareAndSet = Some(modifyIndex), value = Option(semaphoreData.toJson.prettyPrint)))
 
   /**
     * Attempts to the read the ''.lock'' file for the Semaphore 
@@ -254,7 +254,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   /**
     * Finds if there are any stale sessions registered as holders on the ''.semaphore'' file.
     * This is done by comparing the sessions in the file with the session files in the same directory.  
-    * Should there be a mismatch it means that an application has crashed and Consul has reaped the session filesim 
+    * Should there be a mismatch it means that an application has crashed and Consul has reaped the session file
     * @return
     */
   private def pruneStaleHolders(aggregatedData: AggregatedData):Try[AggregatedData] = {
@@ -263,7 +263,8 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       logger.warn(s"Found member file [${kv.key}] without owner for [$semaphoreName], this is the mark of a dead session will delete it")
       consul.deleteKeyValue(kv.key)
     }
-    val newSemData = aggregatedData.semaphoreData.increasePermits(aggregatedData.staleMemberFiles.size).copy(holders = aggregatedData.validHolderIDs)
+    //set the valid holders
+    val newSemData = aggregatedData.semaphoreData.copy(holders = aggregatedData.validHolderIDs)
     Success(aggregatedData.copy(semaphoreData = newSemData))
   }
 }

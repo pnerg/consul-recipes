@@ -216,6 +216,7 @@ class ConsulSim {
     val bindingFuture = Http().bindAndHandle(route, "0.0.0.0", port)
     val binding =  Await.result(bindingFuture, 10.seconds)
     server = Some(binding)
+    logger.info(s"Started Consul Sim on port [${binding.localAddress.getPort}]")
     ConsulHost("localhost", binding.localAddress.getPort)
   }
 

@@ -64,11 +64,9 @@ package object consul {
   case class DeleteKeyValue(key:String, compareAndSet:Option[Int] = None, recursive:Boolean = false)
   
   private[consul] case class SemaphoreData(permits:Int, holders:Set[SessionID]) {
-    def decreasePermits(p:Int = 1):SemaphoreData = copy(permits = permits - p)
-    def increasePermits(p:Int = 1):SemaphoreData = copy(permits = permits + p)
     def addHolder(sessionID: SessionID):SemaphoreData = copy(holders = holders + sessionID)
     def removeHolder(sessionID: SessionID): SemaphoreData = copy(holders = holders.filterNot(_ == sessionID))
-    def hasPermits():Boolean = permits > 0
+    def hasPermits():Boolean = (permits - holders.size) > 0
     def isHolder(sessionID: SessionID):Boolean = holders.contains(sessionID)
   }
 }
