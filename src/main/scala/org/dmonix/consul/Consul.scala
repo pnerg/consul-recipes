@@ -134,7 +134,7 @@ class Consul(httpSender:HttpSender) {
     */
   def readKeyValues(kv: GetKeyValue):Try[Option[Stream[KeyValue]]] = {
     val params = Map(
-      "index" -> kv.modififyIndex,
+      "index" -> kv.modifyIndex,
       "wait" -> kv.maxWait.map(_.toMillis+"ms"),
       "recurse" -> (if(kv.recursive) Some(true) else None)
     ).asURLParams
@@ -158,7 +158,7 @@ class Consul(httpSender:HttpSender) {
   def deleteKeyValue(key:String):Try[Boolean] = deleteKeyValue(DeleteKeyValue(key = key))
 
   /**
-    * Recursively deletes the provided key and all its decedents/children.
+    * Recursively deletes the provided key and all its descendants/children.
     * This function is idempotent, i.e. it will not fail even if the key does not exist
     * @param key The key to remove
     * @return ''Success'' if managed to access Consul, then normally 'true'

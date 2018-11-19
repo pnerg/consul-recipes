@@ -9,13 +9,41 @@ package object consul {
 
   type SessionID = String
 
+  /**
+    * Connection information to a Consul instance
+    * @param host The host
+    * @param port Optional port (default 8500)
+    */
   case class ConsulHost(host:String, port:Int = 8500)
-  
+
+  /**
+    * Represents stored session data in Consul
+    * @param name Optional name of the session
+    * @param lockDelay Optional lock delay
+    * @param node Optional Consul node for the session
+    * @param behavior Optional ''behavior'' of the session
+    * @param ttl Optional Time-To-Live of the session, not providing this will in practice be a session that never times out 
+    */
   case class Session(name:Option[String] = None, lockDelay:Option[FiniteDuration] = None, node:Option[String] = None, behavior:Option[String] = None, ttl:Option[FiniteDuration] = None)
 
+  /**
+    * Represents a key/value stored in Consul
+    * @param createIndex The ''CreateIndex'' value as stored in Consul
+    * @param modifyIndex The ''ModifyIndex'' value as stored in Consul
+    * @param lockIndex The ''LockIndex'' value as stored in Consul
+    * @param key The name/path of the key
+    * @param value The value in plain string format already Base64 decoded
+    * @param session Optional owner (session ÍD) of the key
+    */
   case class KeyValue(createIndex:Int, modifyIndex:Int, lockIndex:Int, key:String, value:Option[String], session:Option[String])
 
-  case class GetKeyValue(key:String, modififyIndex:Option[Int] = None, maxWait:Option[FiniteDuration] = None, recursive:Boolean = false)
+  /**
+    * Data for setting a key/value
+    * @param key The name/path of the key (e.g. foo/bar/my-data)
+    * @param modifyIndex Optional modification index value to block on
+    * @param maxWait Optional max wait time, used in conjunction with ''modifyIndex''
+    */
+  case class GetKeyValue(key:String, modifyIndex:Option[Int] = None, maxWait:Option[FiniteDuration] = None, recursive:Boolean = false)
   
   /**
     * Data for setting a key/value

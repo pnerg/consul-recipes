@@ -9,6 +9,9 @@ import org.dmonix.consul.Semaphore.sessionTTL
 import org.slf4j.LoggerFactory
 import Implicits._
 
+/**
+  * Companion object to [[Semaphore]]
+  */
 object Semaphore {
   private[consul] val sessionTTL = 10.seconds
   private[consul] val permitFileName = ".permits"
@@ -56,6 +59,7 @@ object Semaphore {
 
 
 import Semaphore._
+
 /**
   * @author Peter Nerg
   */
