@@ -10,6 +10,12 @@ package object consul {
   type SessionID = String
 
   /**
+    * Indicates that the ''.destroy'' method has been invoked on semaphore
+    * @param name The name of the semaphore
+    */
+  case class SemaphoreDestroyed(name:String) extends Exception(s"The semaphore [$name] has been permanently destroyed")
+  
+  /**
     * Connection information to a Consul instance
     * @param host The host
     * @param port Optional port (default 8500)
@@ -62,7 +68,12 @@ package object consul {
     * @param recursive If all key/values in the provided path shall be deleted
     */
   case class DeleteKeyValue(key:String, compareAndSet:Option[Int] = None, recursive:Boolean = false)
-  
+
+  /**
+    * Represents the ''.semaphore'' file stored for each semaphore instance in Consul.
+    * @param permits The initial permits as stored in Consul
+    * @param holders The sessionID's for all holders of a permission
+    */
   private[consul] case class SemaphoreData(permits:Int, holders:Set[SessionID]) {
     def addHolder(sessionID: SessionID):SemaphoreData = copy(holders = holders + sessionID)
     def removeHolder(sessionID: SessionID): SemaphoreData = copy(holders = holders.filterNot(_ == sessionID))

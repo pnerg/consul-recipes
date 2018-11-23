@@ -30,13 +30,16 @@ object Semaphore {
     * @return
     */
   def apply(consulHost: ConsulHost, semaphoreName:String, initialPermits:Int):Try[Semaphore] = {
-    val consul = createConsul(consulHost) 
-    val semaphorePath = "semaphores/"+semaphoreName
-    val lockData = SemaphoreData(initialPermits, Set.empty).toJson.prettyPrint
+    Try(require(initialPermits > 0, s"'initialPermits' must be a positive value but [$initialPermits] was provided"))
+      .flatMap{ _ =>
+        val consul = createConsul(consulHost)
+        val semaphorePath = "semaphores/"+semaphoreName
+        val lockData = SemaphoreData(initialPermits, Set.empty).toJson.prettyPrint
 
-    consul
-      .storeKeyValueIfNotSet(lockFile(semaphorePath), Some(lockData))
-      .map(_ => new Semaphore(consul, semaphoreName))
+        consul
+          .storeKeyValueIfNotSet(lockFile(semaphorePath), Some(lockData))
+          .map(_ => new Semaphore(consul, semaphoreName))
+      }
   }
   
   private def lockFile(path:String) = path + "/" + permitFileName
@@ -61,6 +64,14 @@ object Semaphore {
 import Semaphore._
 
 /**
+  * A semaphore is a construction to control access to a common resource in a concurrent system.  
+  * The semaphore in this library allows for creation of a distributed lock.   
+  * In principle a semaphore is initiated with ''1..n'' permits, instances of a semaphore then try to acquire one permit either succeeding or failing in case there are no more permits left to take.  
+  * The simplest form is a binary semaphore which has only one permit thus only allowing a single instance to acquire a permit.  
+  * Semaphores are traditionally used to control access to a protected source like a database or some task that only should be executed by a single process.     
+  *
+  * Each instance of the Semaphore class can hold exactly 0 or 1 permit thus invoking any of the ''tryAcquire'' functions mulitple times will not acquire additional permits.
+  *
   * @author Peter Nerg
   */
 class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
@@ -111,6 +122,13 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   }
 
   /**
+    * Destroys all data for the semaphore. 
+    * Any instances blocking for a permit will be released and return as ''Failure'',
+    * @return
+    */
+  def destroy():Try[Boolean] = release.flatMap(_ => consul.deleteKeyValueRecursive("semaphores/"+semaphoreName)) 
+  
+  /**
     * Attempts to acquire a permit without blocking.  
     * If this instance is already holding a permit no further permits are taken
     * @return ''Success'' if managed to access Consul, then ''true'' if a permit was acquired.
@@ -140,10 +158,13 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
     if(deadline.hasTimeLeft()) {
       tryAcquireInternal().flatMap {
         //got the lock, return
-        case (true, _) => Success(true)
+        case (true, _) => 
+          Success(true)
         //did not get the lock, block on the lock file and try again
         //the readLockData returns if the lockData file has changed or the waitTime expires  
-        case (false, aggregatedData) if deadline.hasTimeLeft => readSemaphoreInfo(aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
+        case (false, aggregatedData) if deadline.hasTimeLeft => 
+          logger.debug(s"No permits left for [$semaphoreName], will block on index [${aggregatedData.semaphoreKeyFile.modifyIndex+1}] for max [${deadline.timeLeft}] waiting for an update")
+          readSemaphoreInfo(aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
         //didn't get lock and we're passed the deadline, bail out
         case (false, _) =>
           logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
@@ -226,7 +247,8 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
           case Some(data) => Success(AggregatedData(kv, data, memberFiles))
           case None => Failure(new IllegalStateException(s"The data for path [$permitFile] has been erased"))
         }
-        case None => Failure(new IllegalStateException(s"The path [$permitFile] no longer exists"))
+        //the data for the semaphore has been deleted, could be due to invoking "destroy", just bail out
+        case None => Failure(SemaphoreDestroyed(semaphoreName))
       }
     }).flatten
   }

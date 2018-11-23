@@ -17,8 +17,10 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
   private def consulHost:ConsulHost = consulSim.consulHost.get
 //    private def consulHost:ConsulHost = ConsulHost("localhost", 8500)
 
-  /*
   "Single member semaphore" >> {
+    "Shall fail to create instance if illegal initialPermit is supplied" >> {
+      Semaphore(consulHost, "illegal-value", 0) must beFailedTry
+    }
     "shall acquire successfully if there are permits" >> {
       val semaphore = Semaphore(consulHost, "single-member-with-permits", 1).get
       semaphore.tryAcquire() must beASuccessfulTry(true)
@@ -31,18 +33,8 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
       semaphore.tryAcquire(5.seconds) must beASuccessfulTry(true) //second acquire shall immediately return true as we already hold a permit
       semaphore.release() must beASuccessfulTry(true)
     }
-    "shall fail acquire if there are no permits" >> {
-      val semaphore = Semaphore(consulHost, "single-member-without-permits", 0).get
-      semaphore.tryAcquire() must beASuccessfulTry(false)
-      semaphore.release() must beASuccessfulTry(false)
-    }
-    "shall fail acquire with wait if there are no permits" >> {
-      val semaphore = Semaphore(consulHost, "single-member-without-permits-with-wait", 0).get
-      semaphore.tryAcquire(20.millis) must beASuccessfulTry(false)
-      semaphore.release() must beASuccessfulTry(false)
-    }
   }
-*/
+
   "multi member semaphore" >> {
     val name = "multi-member"
     val permits = 1
@@ -74,7 +66,7 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
     val s2 = Semaphore(consulHost, name, permits).get
     val s3 = Semaphore(consulHost, name, permits).get
 
-    //both s1 & s2 should successfully acquire
+    //both s1 and s2 should successfully acquire
     s1.tryAcquire() must beASuccessfulTry(true)
     s2.tryAcquire() must beASuccessfulTry(true)
     s3.tryAcquire() must beASuccessfulTry(false)

@@ -15,6 +15,8 @@ object ManualSemaphore extends App {
   
   //catches shutdown of the app and releases any potential permits
   sys.addShutdownHook {
+    //try this to force a destruction of the semaphore, will fail all those blocking/waiting for a permit
+    //semaphore.destroy() 
     semaphore.release()
     blocker.release()
   }
@@ -22,6 +24,7 @@ object ManualSemaphore extends App {
   semaphore.tryAcquire(5.minutes) match {
     case Success(true) => println("Yay, got a permit!")
     case Success(false) => println("Didn't get a permit...:(")
+    case Failure(SemaphoreDestroyed(name)) => println(s"Semaphore [$name] was destroyed, just keep doing something else")
     case Failure(ex) => ex.printStackTrace()
   }
   
