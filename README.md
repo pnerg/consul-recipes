@@ -45,7 +45,7 @@ Semaphores are traditionally used to control access to a protected source like a
 Each instance of the _Semaphore_ class can hold exactly 0 or 1 permit.  
 
 It all starts by creating a Semaphore instance.  
-Note the _.get_ in the end as the result is a `Try[Semaphore]`.
+Note the _.get_ in the of this example end as the result is a `Try[Semaphore]`.
 ```scala
 val semaphore = Semaphore(ConsulHost("localhost"), "example-semaphore", 1).get
 ````
