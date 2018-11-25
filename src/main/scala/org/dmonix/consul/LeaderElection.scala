@@ -33,6 +33,7 @@ object LeaderElection {
 
 /**
   * Observer to be notified for changes in election state.
+  * @author Peter Nerg
   */
 trait ElectionObserver {
   /**
@@ -71,6 +72,15 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
+/**
+  * Implements the election candidate. 
+  * @param consul
+  * @param groupName
+  * @param sessionID
+  * @param info
+  * @param observer
+  * @author Peter Nerg
+  */
 private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String, sessionID:SessionID, info: Option[String], observer:Option[ElectionObserver]) extends Candidate {
   private val logger = LoggerFactory.getLogger(classOf[Candidate])
   

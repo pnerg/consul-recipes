@@ -1,5 +1,7 @@
 package org.dmonix.consul
 
+import java.util.concurrent.TimeUnit
+
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
@@ -54,18 +56,15 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
   }
 
   private class TestObserver extends ElectionObserver {
-    private val blocker = new Object()
+    private val blocker = new java.util.concurrent.Semaphore(0)
     @volatile var isElected = false
-    def block():Unit =
-      blocker.synchronized {
-        blocker.wait(10000)        
-      }
+    def block():Unit = {
+      blocker.tryAcquire(10, TimeUnit.SECONDS)
+    }
    
     private def elected(state:Boolean): Unit = {
       isElected = state
-      blocker.synchronized {
-        blocker.notifyAll()
-      }
+      blocker.release()
     }
     
     override def elected():  Unit = elected(true)
