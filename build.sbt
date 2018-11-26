@@ -1,19 +1,9 @@
-import org.dmonix.sbt.MavenCentralPlugin._
-
-enablePlugins(MavenCentralPlugin)
 name := "consul-recipes"
 
 organization := "org.dmonix"
 version := "0.3.0"
 scalaVersion := "2.12.0"
 crossScalaVersions := Seq("2.11.12", "2.12.0")
-
-//info required for Maven Central
-startYear := Some(2018)
-homepage := Some(new URL("https://github.com/pnerg/consul-recipes"))
-scmInfo := Some(github("pnerg/consul-recipes"))
-licenses := Seq(apache)
-developers := List(githubDeveloper("pnerg", "Peter Nerg"))
 
 scalacOptions := Seq("-feature",
     "-language:postfixOps",
