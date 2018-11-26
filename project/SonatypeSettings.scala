@@ -2,6 +2,8 @@ import sbt.Keys._
 import sbt.{AutoPlugin, Developer, PluginTrigger, Plugins, ScmInfo, plugins, _}
 import xerial.sbt.Sonatype._
 import xerial.sbt._
+import com.typesafe.sbt._
+import com.typesafe.sbt.pgp.PgpKeys._
 
 /**
   * Project settings related to sbt-sonatype.
@@ -10,7 +12,7 @@ import xerial.sbt._
   */
 object SonatypeSettings extends AutoPlugin {
   override def trigger: PluginTrigger = allRequirements
-  override def requires: Plugins = plugins.JvmPlugin && Sonatype
+  override def requires: Plugins = plugins.JvmPlugin && Sonatype && SbtPgp
 
   object autoImport extends SonatypeKeys
   
@@ -33,6 +35,9 @@ object SonatypeSettings extends AutoPlugin {
     ),
     developers := List(
       Developer(id="pnerg", name="Peter Nerg", email="", url=url("https://github.com/pnerg"))
-    )
+    ),
+    useGpgAgent := true,
+    useGpg := true,
+    gpgCommand := "/usr/local/bin/gpg2"
   )
 }
