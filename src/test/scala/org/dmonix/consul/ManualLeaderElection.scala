@@ -22,7 +22,7 @@ package org.dmonix.consul
   * @author Peter Nerg
   */
 object ManualLeaderElection extends App {
-  private val semaphore = new java.util.concurrent.Semaphore(0)
+  private val blocker = new java.util.concurrent.Semaphore(0)
   
   //simple observer that just prints election changes
   private val observer = new ElectionObserver {
@@ -35,9 +35,9 @@ object ManualLeaderElection extends App {
   //catches shutdown of the app and makes the candidate leave the election process
   sys.addShutdownHook {
     candidate.leave()
-    semaphore.release()
+    blocker.release()
   }
   
   //hold here for the lifetime of the app
-  semaphore.acquire()
+  blocker.acquire()
 }
