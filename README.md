@@ -100,7 +100,7 @@ It will start a small app that registers a candidate for the leader election.
 Start multiple instances to make more clients to join, also try killing the elected leader to see how someone else picks up leadership.
 
 ## Semaphore
-Clone this Git repository and run the [ManualSemaphore](src/test/scala/org/dmonix/consul/MaSemaphore.scala) class in your favorite IDE.  
+Clone this Git repository and run the [ManualSemaphore](src/test/scala/org/dmonix/consul/ManualSemaphore.scala) class in your favorite IDE.  
 It will start a small app that tries to register a semaphore and try to take a permit.  
 Start multiple instances to make more instances to join, also try killing the instance that has a permit to see how someone else is released.
 
