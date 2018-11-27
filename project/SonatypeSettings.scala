@@ -34,6 +34,5 @@ object SonatypeSettings extends AutoPlugin {
     developers := List(
       Developer(id="pnerg", name="Peter Nerg", email="", url=url("https://github.com/pnerg"))
     )
-    //gpgCommand := "/usr/local/bin/gpg2"
   )
 }

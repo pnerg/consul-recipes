@@ -12,8 +12,6 @@ scalacOptions := Seq("-feature",
     "-deprecation",
     "-encoding", "utf8")
 
-gpgCommand := "/usr/local/bin/gpg2"
-
 val `specs-core-version` = "4.3.4"
 libraryDependencies ++= Seq(
     "io.spray" %%  "spray-json"  % "1.3.4",
