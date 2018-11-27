@@ -103,3 +103,12 @@ Start multiple instances to make more clients to join, also try killing the elec
 Clone this Git repository and run the [ManualSemaphore](src/test/scala/org/dmonix/consul/MaSemaphore.scala) class in your favorite IDE.  
 It will start a small app that tries to register a semaphore and try to take a permit.  
 Start multiple instances to make more instances to join, also try killing the instance that has a permit to see how someone else is released.
+
+# Download
+The project is cross-compiled for Scala 2.11 and 2.12.  
+Latest version is [![consul-recipes](https://maven-badges.herokuapp.com/maven-central/org.dmonix/consul-recipes_2.12/badge.svg?style=plastic)](https://search.maven.org/search?q=consul-recipes)  
+Simply add the following dependency:
+```
+"org.dmonix" %% "consul-recipes" % [version]
+```
+All available versions are found on [Maven Central](https://search.maven.org/search?q=consul-recipes)
