@@ -239,7 +239,7 @@ class ConsulSim {
 
   def shutdown(): Terminated = synchronized {
     val shutdownFuture = server
-      .map(_.unbind()) //unbind the server if it is started
+      .map(_.terminate(5.seconds)) //terminate the server if it is started
       .getOrElse(Future.successful(())) //server not started, shutdown is "success"
       .flatMap(_ => system.terminate()) //terminate the actor system
 
