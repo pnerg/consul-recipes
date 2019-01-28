@@ -60,7 +60,6 @@ object Semaphore {
   private def lockFile(path:String) = path + "/" + permitFileName
   private[consul] implicit class RichKeyValue(kv: KeyValue) {
     def isPermitFile:Boolean = kv.key.endsWith(permitFileName)
-    def valueAsPermitData:Option[SemaphoreData] = kv.value.map(_.parseJson.convertTo[SemaphoreData])
   }
 
   /**
@@ -242,9 +241,9 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
     }
   }
   
-  private def storeLockData(semaphoreData: SemaphoreData, modifyIndex:Int):Try[Boolean] = 
+  private def storeLockData(semaphoreData: SemaphoreData, modifyIndex:Int):Try[Boolean] =
     consul
-      .storeKeyValue(SetKeyValue(key = permitFile, compareAndSet = Some(modifyIndex), value = Option(semaphoreData.toJson.prettyPrint)))
+      .storeKeyValue(SetKeyValue(permitFile, semaphoreData.toJson).withCompareAndSet(modifyIndex))
 
   /**
     * Attempts to the read the ''.lock'' file for the Semaphore 
@@ -258,7 +257,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       memberFiles <- readMemberFiles
     } yield {
       semaphorePermitFile match {
-        case Some(kv) => kv.valueAsPermitData match {
+        case Some(kv) => kv.convertValueTo[SemaphoreData] match {
           case Some(data) => Success(AggregatedData(kv, data, memberFiles))
           case None => Failure(new IllegalStateException(s"The data for path [$permitFile] has been erased"))
         }

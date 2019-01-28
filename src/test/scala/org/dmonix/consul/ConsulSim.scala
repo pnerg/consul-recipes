@@ -81,7 +81,7 @@ class ConsulSim {
       pathPrefix("create") {
         put {
 //          val sessionID = UUID.randomUUID().toString
-          //easier to debug/trace logs with a seqential counter as sessionID generator
+          //easier to debug/trace logs with a sequential counter as sessionID generator
           val sessionID = "session-"+sessionCounter.incrementAndGet()
            val rsp = s"""
               |{
@@ -164,7 +164,7 @@ class ConsulSim {
           parameters('cas ?, 'recurse.?) { (cas, recurse) =>
             val recursive = recurse getOrElse false //TODO implement recursive delete
             keyValues.remove(key).foreach{kv =>
-              blockers.get(kv.key).foreach(_.foreach(_.semaphore.release()))
+              blockersFor(kv).foreach(_.semaphore.release())
             }
             complete(HttpEntity(ContentTypes.`application/json`, "true"))
           }
@@ -205,10 +205,12 @@ class ConsulSim {
       //notify any lock holders that the key has changed
       //we don't care to prune used Semaphores, sure this will leak objects but for a test rig it won't matter.
       //only release those that have a 'index' <= than the ModifyIndex on the key
-      blockers.get(kv.key).foreach(_.foreach(_.releaseIfIndexReached(kv.modifyIndex)))
+      blockersFor(kv).foreach(_.releaseIfIndexReached(kv.modifyIndex))
     }
     res.isDefined
   }
+  
+  private def blockersFor(kv:KeyValue):Seq[Blocker] = blockers.get(kv.key) getOrElse Nil
 
   private def readKey(key:String, index:Int, wait:FiniteDuration):Option[KeyValue] = {
     keyValues.get(key).flatMap{kv =>
