@@ -33,7 +33,7 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
     lazy val candidate1 = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer1)).get
     lazy val candidate2 = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer2)).get
 
-    observer1.block()
+    observer1.blockForChange()
     candidate1.isLeader === true
     observer1.isElected === true
 
@@ -43,11 +43,11 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
     //drop the leader, force a re-election
     candidate1.leave()
 
-    observer1.block()
+    observer1.blockForChange()
     candidate1.isLeader === false
     observer1.isElected === false
 
-    observer2.block()
+    observer2.blockForChange()
     candidate2.isLeader === true
     observer2.isElected === true
     
@@ -56,10 +56,11 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
   }
 
   private class TestObserver extends ElectionObserver {
-    private val blocker = new java.util.concurrent.Semaphore(0)
+    private var blocker = new java.util.concurrent.Semaphore(0)
     @volatile var isElected = false
-    def block():Unit = {
+    def blockForChange():Unit = {
       blocker.tryAcquire(10, TimeUnit.SECONDS)
+      blocker = new java.util.concurrent.Semaphore(0)
     }
    
     private def elected(state:Boolean): Unit = {
