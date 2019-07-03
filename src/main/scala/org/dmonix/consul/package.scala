@@ -22,6 +22,8 @@ import scala.concurrent.duration.FiniteDuration
   * @author Peter Nerg
   */
 package object consul {
+  
+  case class NoSuchKeyError(path:String) extends Exception(s"The key [$path] does not exist")
 
   type SessionID = String
 
@@ -121,6 +123,7 @@ package object consul {
     import spray.json._
     def withCompareAndSet(cas:Int): SetKeyValue = copy(compareAndSet = Some(cas))
     def withValue(value:JsValue):SetKeyValue = copy(value = Some(value.prettyPrint))
+    def withValue(value:String):SetKeyValue = copy(value = Some(value))
     def withAcquire(sessionID: SessionID): SetKeyValue = copy(acquire = Some(sessionID))
     def withRelease(sessionID: SessionID): SetKeyValue = copy(release = Some(sessionID))
   }

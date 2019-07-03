@@ -176,7 +176,18 @@ class ConsulSim {
   
   private def sessionExists(sessionID:String):Boolean = sessions.contains(sessionID)
   private def attemptSetKey(kv: KeyValue, cas:Option[Int], acquire:Option[String], release:Option[String]): Boolean = {
-    val passedCAS = cas.map(_ == kv.modifyIndex) getOrElse true
+    //val passedCAS = cas.map(_ == kv.modifyIndex) getOrElse true
+    val passedCAS = {
+      cas match {
+        //asking for cas=0 means the key must not exist
+        case Some(0) => !keyValues.contains(kv.key)
+        //any other cas value is checked against the stored ModifyIndex
+        case Some(c) => c == kv.modifyIndex
+        //no cas, just go
+        case None => true
+      }
+    
+    }
     def isUnlocked:Boolean = kv.session.isEmpty
     def isLockOwner(sessionID:String): Boolean = kv.session.map(_ == sessionID) getOrElse false 
 
