@@ -31,6 +31,7 @@ class CASLongSpec extends Specification with BeforeAfterAll {
   override def afterAll = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
+  private lazy val consul = Consul(consulHost)
   
   private def initLong(initVal:Long = 0):CASLong = CASLong.initiate(consulHost, "long-"+atomic.incrementAndGet(), initVal).get
   
@@ -41,4 +42,61 @@ class CASLongSpec extends Specification with BeforeAfterAll {
     }
   }
 
+  "performing increment" >> {
+    "increment shall return the new value of the long in case successful" >> {
+      val counter = initLong(0)
+      counter.incrementAndGet() must beASuccessfulTry.withValue(1L)
+      counter.currentValue() must beASuccessfulTry.withValue(1L)
+    }
+    "increment with provided delta shall return the new value of the long in case successful" >> {
+      val counter = initLong(0)
+      counter.incrementAndGet(69) must beASuccessfulTry.withValue(69L)
+      counter.currentValue() must beASuccessfulTry.withValue(69L)
+    }
+  }
+
+  "performing decrement" >> {
+    "decrement shall return the new value of the long in case successful" >> {
+      val counter = initLong(70)
+      counter.decrementAndGet() must beASuccessfulTry.withValue(69L)
+      counter.currentValue() must beASuccessfulTry.withValue(69L)
+    }
+    "decrement with provided delta shall return the new value of the long in case successful" >> {
+      val counter = initLong(69)
+      counter.decrementAndGet(69) must beASuccessfulTry.withValue(0L)
+      counter.currentValue() must beASuccessfulTry.withValue(0L)
+    }
+    "decrement beyond zero shall return the new negative value of the long in case successful" >> {
+      val counter = initLong(0)
+      counter.decrementAndGet() must beASuccessfulTry.withValue(-1L)
+      counter.currentValue() must beASuccessfulTry.withValue(-1L)
+    }
+  }
+  
+  "get current value" >> {
+    "shall be successful if key exists and has a numerical value" >> {
+      val counter = initLong(69)
+      counter.currentValue() must beASuccessfulTry.withValue(69L)
+    }
+    "shall fail if key doesn't exists" >> {
+      val counter = new CASLong(consulHost, "no-such-path")
+      counter.currentValue() must beAFailedTry.withThrowable[NoSuchKeyException]
+    }
+    "shall fail if exists but has no value" >> {
+      val path = "empty-path"
+      consul.storeKeyValue(path, None)
+      
+      val counter = new CASLong(consulHost, path)
+      println(counter.currentValue())
+      counter.currentValue() must beAFailedTry.withThrowable[NumberFormatException]
+    }
+    "shall fail if exists but has non-numerical value" >> {
+      val path = "not-a-number-path"
+      consul.storeKeyValue(path, Some("not-a-number"))
+
+      val counter = new CASLong(consulHost, path)
+      println(counter.currentValue())
+      counter.currentValue() must beAFailedTry.withThrowable[NumberFormatException]
+    }
+  }
 }

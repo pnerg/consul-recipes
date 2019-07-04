@@ -23,7 +23,7 @@ import scala.concurrent.duration.FiniteDuration
   */
 package object consul {
   
-  case class NoSuchKeyError(path:String) extends Exception(s"The key [$path] does not exist")
+  case class NoSuchKeyException(path:String) extends Exception(s"The key [$path] does not exist")
 
   type SessionID = String
 
