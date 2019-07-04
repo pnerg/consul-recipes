@@ -60,8 +60,8 @@ class ConsulSim {
   private var server: Option[ServerBinding] = None
 
   private val sessionCounter = new AtomicInteger(0)
-  private val creationCounter = new AtomicInteger(0)
-  private val modificationCounter = new AtomicInteger(0)
+  private val creationCounter = new AtomicInteger(1)
+  private val modificationCounter = new AtomicInteger(1)
   
   private val sessions = mutable.Map[String, Session]()
   private val keyValues = mutable.Map[String, KeyValue]()
