@@ -84,6 +84,22 @@ This will delete all files in Consul related to the semaphore and in the process
 semaphore.destroy()
 ```
 
+# Compare-and-set Long
+The [CASLong](src/test/scala/org/dmonix/consul/CASLong.scala) class implements a distributed variant of the [AtomicLong](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/atomic/AtomicLong.html). The principle is to have atomic read and updates to a shared long value.  
+That is multiple applications can share the same counter. 
+The principle of changing the persisted counter/long value is to:  
+1. read the value from Consul including the latest _ModificationIndex_.  
+2. store the updated value to Consul using compare-and-set with the read _ModificationIndex_.  
+
+Should the write fail due to concurrency issues, we loop back to step 1 and try again. 
+
+Example of usage:
+```scala
+//note the .get as the results are a Try, you should probably manage any faults in a better way
+val casLong = CASLong.initiate(ConsulHost("localhost"), "example-long", 0).get
+val newValue = casLong.incrementAndGet(69).get
+``` 
+
 # Testing
 
 ## Local Consul
@@ -91,7 +107,7 @@ To play around with the library one needs an instance of Consul.
 The easiest way is to run Consul locally in a Docker container.  
 This command starts a local Consul that can be accessed on [localhost:8500](http://localhost:8500)
 ```bash
-docker run --rm -p 8500:8500 consul:1.3.0 agent -server -bootstrap -ui -client=0.0.0.0
+docker run --rm -p 8500:8500 consul:1.5.2 agent -server -bootstrap -ui -client=0.0.0.0
 ``` 
 
 ## Leader Election
