@@ -112,7 +112,7 @@ class Consul(httpSender:HttpSender) {
 
     httpSender
       .put(s"/kv/${kv.key}"+params, kv.value)
-      .map(_.toBoolean)
+      .map(_.trim.toBoolean)
   }
 
   /**
@@ -194,7 +194,7 @@ class Consul(httpSender:HttpSender) {
 
     httpSender
       .delete("/kv/"+kv.key+params)
-      .map(_.toBoolean)
+      .map(_.trim.toBoolean)
   }
   
 }

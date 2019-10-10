@@ -1,7 +1,7 @@
 name := "consul-recipes"
 
 organization := "org.dmonix"
-version := "0.3.0"
+version := "0.3.1"
 scalaVersion := "2.12.0"
 crossScalaVersions := Seq("2.11.12", "2.12.0")
 
