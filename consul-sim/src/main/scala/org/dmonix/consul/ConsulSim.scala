@@ -66,55 +66,56 @@ class ConsulSim {
   private val sessions = mutable.Map[String, Session]()
   private val keyValues = mutable.Map[String, KeyValue]()
   private val blockers = mutable.Map[String, Seq[Blocker]]()
-  
-  /**
-    * Route for managing the various HTTP requests sent to the simulator
-    */
-  private val route: Route =
+
   /**
     * ==============================
+    * Route for managing the various session related requests sent to the simulator
     * v1/session
     * ==============================
     */
+  private[consul] val sessionRoute: Route =
     pathPrefix("v1" / "session" ) {
       //create session
       pathPrefix("create") {
         put {
-//          val sessionID = UUID.randomUUID().toString
-          //easier to debug/trace logs with a seqential counter as sessionID generator
+          //easier to debug/trace logs with a sequential counter as sessionID generator
           val sessionID = "session-"+sessionCounter.incrementAndGet()
-           val rsp = s"""
-              |{
-              | "ID": "$sessionID"
-              |}
+          val rsp = s"""
+                       |{
+                       | "ID": "$sessionID"
+                       |}
             """.stripMargin
           sessions.put(sessionID, Session())
           logger.debug(s"Created session [$sessionID]")
           complete(HttpEntity(ContentTypes.`application/json`, rsp))
         }
       } ~
-      //destroy session
-      pathPrefix("destroy" / Remaining)  { sessionID =>
-        sessions.remove(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
-        complete(HttpEntity(ContentTypes.`application/json`, "true"))
-      } ~
-      //renew session
-      pathPrefix("renew" / Remaining)  { sessionID =>
-        sessions.get(sessionID) match {
-          case Some(session) => 
-            //FIXME update the session data
-            logger.debug(s"Renewed session [$sessionID]")
-            complete(HttpEntity(ContentTypes.`application/json`, session.toJson.prettyPrint))
-          case None => 
-            complete(StatusCodes.NotFound, s"Session id '$sessionID' not found")
+        //destroy session
+        pathPrefix("destroy" / Remaining)  { sessionID =>
+          sessions.remove(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
+          complete(HttpEntity(ContentTypes.`application/json`, "true"))
+        } ~
+        //renew session
+        pathPrefix("renew" / Remaining)  { sessionID =>
+          sessions.get(sessionID) match {
+            case Some(session) =>
+              //FIXME update the session data
+              logger.debug(s"Renewed session [$sessionID]")
+              complete(HttpEntity(ContentTypes.`application/json`, session.toJson.prettyPrint))
+            case None =>
+              complete(StatusCodes.NotFound, s"Session id '$sessionID' not found")
+          }
         }
-      }
-    } ~
-      /**
-        * ==============================
-        * v1/kv
-        * ==============================
-        */
+    }
+
+
+  /**
+    * ==============================
+    * Route for managing the various key/value requests sent to the simulator
+    * v1/kv
+    * ==============================
+    */
+  private[consul] val keyValueRoute: Route =
     pathPrefix("v1" / "kv" / Remaining) { key =>
       //store kv
       put {
@@ -139,7 +140,7 @@ class ConsulSim {
           }
         }
       } ~
-      //read kv
+        //read kv
         get {
           parameters('index ?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
@@ -147,10 +148,10 @@ class ConsulSim {
             logger.debug(s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]")
             readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
-              case Some(kv) if recurse.isEmpty => 
+              case Some(kv) if recurse.isEmpty =>
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
               //recursive call, return all keys on the requested path
-              case _ if recurse.isDefined => 
+              case _ if recurse.isDefined =>
                 val res = keyValues.filterKeys(_.startsWith(key)).values.toSeq
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
               //no such key
@@ -159,7 +160,7 @@ class ConsulSim {
             }
           }
         } ~
-      //delete kv
+        //delete kv
         delete {
           parameters('cas ?, 'recurse.?) { (cas, recurse) =>
             val recursive = recurse getOrElse false //TODO implement recursive delete
@@ -228,7 +229,7 @@ class ConsulSim {
   }
   
   def start(port:Int = 0): ConsulHost = synchronized {
-    val bindingFuture = Http().bindAndHandle(route, "0.0.0.0", port)
+    val bindingFuture = Http().bindAndHandle(sessionRoute ~ keyValueRoute, "0.0.0.0", port)
     val binding =  Await.result(bindingFuture, 10.seconds)
     server = Some(binding)
     logger.info(s"Started Consul Sim on port [${binding.localAddress.getPort}]")
