@@ -1,7 +1,10 @@
 publishArtifact := false
 
 
-val `specs-core-version` = "4.3.4"
+val `specs-core-version` = "4.8.3"
+val `akka-version` = "2.5.29"
+val `akka-http-version` = "10.1.11"
+
 val baseSettings = Seq(
   organization := "org.dmonix",
   version := "0.4.0-SNAPSHOT",
@@ -14,8 +17,10 @@ val baseSettings = Seq(
     "-deprecation",
     "-encoding", "utf8"),
   libraryDependencies ++= Seq(
-    "io.spray" %%  "spray-json"  % "1.3.4",
-    "org.slf4j" % "slf4j-api" % "1.7.25",
+    "io.spray" %%  "spray-json"  % "1.3.5",
+    "org.slf4j" % "slf4j-api" % "1.7.30",
+    "com.typesafe.akka" %% "akka-actor" % `akka-version`,
+    "com.typesafe.akka" %% "akka-stream"  % `akka-version`,
     "org.specs2" %% "specs2-core" % `specs-core-version` % "test",
     "org.specs2" %% "specs2-mock" % `specs-core-version` % "test",
     "org.specs2" %% "specs2-junit" % `specs-core-version` % "test",
@@ -42,7 +47,9 @@ lazy val recipes = (project in file("consul-sim"))
   .settings(
     name := "consul-sim",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.11"
+      "com.typesafe.akka" %% "akka-http" % `akka-http-version`,
+      "com.typesafe.akka" %% "akka-stream-testkit" % `akka-version` % "test",
+      "com.typesafe.akka" %% "akka-http-testkit" % `akka-http-version` % "test"
     )
   )
   .dependsOn(common)
