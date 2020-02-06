@@ -12,10 +12,9 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
 
   override def beforeAll = consulSim.start()
-  override def afterAll = ()//consulSim.shutdown()
+  override def afterAll = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
-//  private def consulHost:ConsulHost =ConsulHost("localhost", 8500)
 
   "Single member election" >> {
     val observer = new TestObserver()
