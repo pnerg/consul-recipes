@@ -37,8 +37,14 @@ import scala.concurrent.{Await, Future}
 
 
 object ConsulSim  {
+  private case class Blocker(index:Int, semaphore: jSemaphore) {
+    def releaseIfIndexReached(mi:Int):Unit = if(mi >= index)semaphore.release()
+  }
+
   def apply() = new ConsulSim()
 }
+
+import ConsulSim._
 
 /**
   * Simulates Consul
@@ -49,9 +55,6 @@ class ConsulSim {
   private val logger = LoggerFactory.getLogger(classOf[ConsulSim])
   private val zeroDuration = 0.seconds
   private val defaultDuration = 5.seconds
-  private case class Blocker(index:Int, semaphore: jSemaphore) {
-    def releaseIfIndexReached(mi:Int):Unit = if(mi >= index)semaphore.release()
-  }
 
   private implicit val system = ActorSystem("consul-sim")
   private implicit val materializer = ActorMaterializer()
@@ -59,14 +62,57 @@ class ConsulSim {
 
   private var server: Option[ServerBinding] = None
 
-  private val sessionCounter = new AtomicInteger(0)
+  /** The internal session storage */
+  val sessionStorage = new SessionStorage()
+  
   private val creationCounter = new AtomicInteger(0)
   private val modificationCounter = new AtomicInteger(0)
   
-  private val sessions = mutable.Map[String, Session]()
   private val keyValues = mutable.Map[String, KeyValue]()
   private val blockers = mutable.Map[String, Seq[Blocker]]()
 
+  //============================================================
+  //
+  // Public functions
+  //
+  //============================================================
+  /**
+    * Starts the simulator on the designated port
+    * @param port The port to listen to, defaults to 0 i.e. chosen by the host
+    * @return The host/port the simulator listens to
+    */
+  def start(port:Int = 0): ConsulHost = synchronized {
+    val bindingFuture = Http().bindAndHandle(sessionRoute ~ keyValueRoute, "0.0.0.0", port)
+    val binding =  Await.result(bindingFuture, 10.seconds)
+    server = Some(binding)
+    logger.info(s"Started Consul Sim on port [${binding.localAddress.getPort}]")
+    ConsulHost("localhost", binding.localAddress.getPort)
+  }
+
+  /**
+    * Shutdown the simulator
+    * @return
+    */
+  def shutdown(): Terminated = synchronized {
+    val shutdownFuture = server
+      .map(_.unbind()) //unbind the server if it is started
+      .getOrElse(Future.successful(())) //server not started, shutdown is "success"
+      .flatMap(_ => system.terminate()) //terminate the actor system
+
+    Await.result(shutdownFuture, 30.seconds)
+  }
+
+  /**
+    * Returns the host/port the simulator listens to if started
+    * @return
+    */
+  def consulHost:Option[ConsulHost] = server.map(b => ConsulHost("localhost", b.localAddress.getPort))
+
+  //============================================================
+  //
+  // Internal/private functions
+  //
+  //============================================================
   /**
     * ==============================
     * Route for managing the various session related requests sent to the simulator
@@ -79,25 +125,24 @@ class ConsulSim {
       pathPrefix("create") {
         put {
           //easier to debug/trace logs with a sequential counter as sessionID generator
-          val sessionID = "session-"+sessionCounter.incrementAndGet()
+          val sessionID = sessionStorage.createSession()
           val rsp = s"""
                        |{
                        | "ID": "$sessionID"
                        |}
             """.stripMargin
-          sessions.put(sessionID, Session())
           logger.debug(s"Created session [$sessionID]")
           complete(HttpEntity(ContentTypes.`application/json`, rsp))
         }
       } ~
         //destroy session
         pathPrefix("destroy" / Remaining)  { sessionID =>
-          sessions.remove(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
+          sessionStorage.removeSession(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
           complete(HttpEntity(ContentTypes.`application/json`, "true"))
         } ~
         //renew session
         pathPrefix("renew" / Remaining)  { sessionID =>
-          sessions.get(sessionID) match {
+          sessionStorage.getSession(sessionID) match {
             case Some(session) =>
               //FIXME update the session data
               logger.debug(s"Renewed session [$sessionID]")
@@ -124,9 +169,9 @@ class ConsulSim {
             (acquire, release) match {
               case (Some(id1), Some(id2)) => //both acquire and release are provided => illegal
                 complete(StatusCodes.BadRequest, s"Conflicting flags: acquire=$id1&release=$id2")
-              case (Some(id), None) if !sessionExists(id) => //acquire session does not exist
+              case (Some(id), None) if !sessionStorage.sessionExists(id) => //acquire session does not exist
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
-              case (None, Some(id)) if !sessionExists(id) => //release session does not exist
+              case (None, Some(id)) if !sessionStorage.sessionExists(id) => //release session does not exist
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
               case _ =>
                 val newValue = entity.filterNot(_.isEmpty)
@@ -175,7 +220,6 @@ class ConsulSim {
   private def nextCreationIndex =  creationCounter.getAndIncrement()
   private def nextModificationIndex =  modificationCounter.getAndIncrement()
   
-  private def sessionExists(sessionID:String):Boolean = sessions.contains(sessionID)
   private def attemptSetKey(kv: KeyValue, cas:Option[Int], acquire:Option[String], release:Option[String]): Boolean = {
     val passedCAS = cas.map(_ == kv.modifyIndex) getOrElse true
     def isUnlocked:Boolean = kv.session.isEmpty
@@ -227,25 +271,7 @@ class ConsulSim {
       }
     }
   }
-  
-  def start(port:Int = 0): ConsulHost = synchronized {
-    val bindingFuture = Http().bindAndHandle(sessionRoute ~ keyValueRoute, "0.0.0.0", port)
-    val binding =  Await.result(bindingFuture, 10.seconds)
-    server = Some(binding)
-    logger.info(s"Started Consul Sim on port [${binding.localAddress.getPort}]")
-    ConsulHost("localhost", binding.localAddress.getPort)
-  }
 
-  def shutdown(): Terminated = synchronized {
-    val shutdownFuture = server
-      .map(_.unbind()) //unbind the server if it is started
-      .getOrElse(Future.successful(())) //server not started, shutdown is "success"
-      .flatMap(_ => system.terminate()) //terminate the actor system
-
-    Await.result(shutdownFuture, 30.seconds)
-  }
-
-  def consulHost:Option[ConsulHost] = server.map(b => ConsulHost("localhost", b.localAddress.getPort))
 }
 
 
