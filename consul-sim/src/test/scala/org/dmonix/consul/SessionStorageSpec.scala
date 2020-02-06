@@ -15,13 +15,11 @@
   */
 package org.dmonix.consul
 
-import org.specs2.mutable.Specification
-
 /**
   * Tests for the [[SessionStorage]] class
   * @author Peter Nerg
   */
-class SessionStorageSpec extends Specification {
+class SessionStorageSpec extends ConsulSpecification {
 
   "The session storage shall" >> {
     "be empty when created" >> {
@@ -32,34 +30,28 @@ class SessionStorageSpec extends Specification {
       val sessionID = "123"
       storage.addSession(sessionID, Session())
       storage.sessionCount === 1
-      storage.sessionExists(sessionID) === true
-      storage.getSession(sessionID) must beSome()
+      storage.assertSessionExists(sessionID)
     }
     "allow for creating a session" >> {
       val storage = SessionStorage()
       val sessionID = storage.createSession()
       storage.sessionCount === 1
-      storage.sessionExists(sessionID) === true
-      storage.getSession(sessionID) must beSome()
+      storage.assertSessionExists(sessionID)
       storage.getSessions.get(sessionID) must beSome()
     }
     "allow for creating multiple sessions" >> {
       val storage = SessionStorage()
       val sessionID = storage.createSession()
       storage.sessionCount === 1
-      storage.sessionExists(sessionID) === true
-      storage.getSession(sessionID) must beSome()
+      storage.assertSessionExists(sessionID)
 
       val sessionID2 = storage.createSession()
       storage.sessionCount === 2
-      storage.sessionExists(sessionID2) === true
-      storage.getSession(sessionID2) must beSome()
+      storage.assertSessionExists(sessionID2)
     }
     "return None when fetching non existing session" >> {
       val storage = SessionStorage()
-      val sessionID = "no-such"
-      storage.sessionExists(sessionID) === false
-      storage.getSession(sessionID) must beNone
+      storage.assertSessionNotExists("no-such")
     }
     "allow for removing non-existing session" >> {
       SessionStorage().removeSession("no-such") must beNone

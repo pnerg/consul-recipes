@@ -15,41 +15,17 @@
   */
 package org.dmonix.consul
 
-import java.util.concurrent.atomic.AtomicInteger
-
-import org.specs2.matcher.ResultMatchers
-import org.specs2.mutable.Specification
-
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 /**
   * Tests for the [[KeyValueStorage]] class
   *
   * @author Peter Nerg
   */
-class KeyValueStorageSpec extends Specification with ResultMatchers {
+class KeyValueStorageSpec extends ConsulSpecification {
   
-  private val counter = new AtomicInteger(1)
-  
-  implicit class PimpedKeyValueStorage(storage:KeyValueStorage) {
-    def createInitialKey():KeyValue = {
-      val key = "my-key-"+counter.getAndIncrement()
-      val value = Option("some-value")
-      
-      storage.createOrUpdate(key,value, None, None, None) === true
-      storage.keyExists(key) === true
-      storage.getKeyValue(key).get
-    }
-
-    def assertKeyValue(key:String, expectedValue:Option[String]) = storage.getKeyValue(key) must beSome().which(_.value == expectedValue)
-    def assertKeyExists(kv:KeyValue) = storage.keyExists(kv.key) === true
-    def assertKeyExists(key:String) = storage.keyExists(key) === true
-    def assertKeyNotExists(kv:KeyValue) = storage.keyExists(kv.key) === false
-    def assertKeyNotExists(key:String) = storage.keyExists(key) === false
-  }
-
   "The key storage shall" >> {
     "allow for adding a new key" >> {
       val key = "my-key"

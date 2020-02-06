@@ -17,26 +17,38 @@ package org.dmonix.consul
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.testkit.Specs2RouteTest
-import org.specs2.mutable.Specification
-
+import org.dmonix.consul.ConsulJsonProtocol._
+import org.dmonix.consul.Implicits._
+import spray.json._
 
 /**
   * @author Peter Nerg
   */
-class ConsulSimSessionSpec extends Specification with Specs2RouteTest {
+class ConsulSimSessionSpec extends ConsulSpecification with Specs2RouteTest {
 
   private val sim = ConsulSim()
+  private val storage = sim.sessionStorage
   
   "Creating session shall be successful" >> {
     Put("/v1/session/create") ~> sim.sessionRoute ~> check {
       status shouldEqual StatusCodes.OK
+      val id = responseAs[String].parseJson.fieldValOrFail[String]("ID")
+      storage.assertSessionExists(id)
     } 
   }
 
-  "Destroying session" >> {
-    "shall be successful for non existing session" >> {
+  "Destroying session shall" >> {
+    "be successful for non existing session" >> {
       Put("/v1/session/destroy/no-such-id") ~> sim.sessionRoute ~> check {
         status shouldEqual StatusCodes.OK
+        storage.assertSessionNotExists("no-such-id")
+      }
+    }
+    "be successful for existing session" >> {
+      val id = storage.createSession()
+      Put("/v1/session/destroy/"+id) ~> sim.sessionRoute ~> check {
+        status shouldEqual StatusCodes.OK
+        storage.assertSessionNotExists(id)
       }
     }
   }
