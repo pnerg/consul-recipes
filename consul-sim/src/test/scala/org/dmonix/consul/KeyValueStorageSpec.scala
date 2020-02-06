@@ -34,6 +34,8 @@ class KeyValueStorageSpec extends ConsulSpecification {
       storage.createOrUpdate(key, value, None, None, None) === true
       storage.assertKeyValue(key, value)
       storage.assertKeyExists(key)
+      storage.getKeyValues.get(key) == value
+      
     }
     "allow for updating a key" >> {
       val storage = KeyValueStorage()
