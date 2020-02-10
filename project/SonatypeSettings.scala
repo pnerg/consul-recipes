@@ -16,7 +16,7 @@ object SonatypeSettings extends AutoPlugin {
   
   import autoImport._
   
-  private val projectName = "consul-receipes"
+  private val projectName = "consul-recipes"
 
   override lazy val projectSettings = Seq(
     startYear := Some(2018),

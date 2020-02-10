@@ -27,10 +27,9 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
 
   override def beforeAll = consulSim.start()
-  override def afterAll = ()//consulSim.shutdown()
+  override def afterAll = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
-//    private def consulHost:ConsulHost = ConsulHost("localhost", 8500)
 
   "Single member semaphore" >> {
     "Shall fail to create instance if illegal initialPermit is supplied" >> {
@@ -43,7 +42,6 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
       semaphore.release() must beASuccessfulTry(true)
     }
     "shall acquire successfully with wait if there are permits" >> {
-      val start = System.currentTimeMillis()
       val semaphore = Semaphore(consulHost, "single-member-with-permits-with-wait", 1).get
       semaphore.tryAcquire(5.seconds) must beASuccessfulTry(true)
       semaphore.tryAcquire(5.seconds) must beASuccessfulTry(true) //second acquire shall immediately return true as we already hold a permit
