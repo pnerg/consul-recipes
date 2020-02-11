@@ -76,12 +76,13 @@ class KeyValueStorage {
     * @param release Optional release
     * @return
     */
-  def createOrUpdate(key:String, newValue:Option[String], cas:Option[Int], acquire:Option[String], release:Option[String]): Boolean = {
+  def createOrUpdate(key:String, newValue:Option[String], cas:Option[Int], acquire:Option[String], release:Option[String], flags:Option[Int]): Boolean = {
     val kv = getKeyValue(key)
       .map(_.copy(value = newValue))
-      .getOrElse(KeyValue(createIndex = nextCreationIndex, modifyIndex = 0, lockIndex = 0, key = key, session = None, value = newValue))
+      .getOrElse(KeyValue(createIndex = nextCreationIndex, modifyIndex = 0, lockIndex = 0, flags = flags.getOrElse(0), key = key, session = None, value = newValue))
     attemptSetKey(kv, cas, acquire, release)    
   }
+  
   /**
     * Simulates a recursive fetch of keys matching a path e.g /foo/bar
     * @param path
@@ -101,7 +102,6 @@ class KeyValueStorage {
     }
     keyValue
   }
-
 
   /**
     * Attempts to perform a blocking read of a key

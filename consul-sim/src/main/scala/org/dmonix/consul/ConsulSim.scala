@@ -142,7 +142,7 @@ class ConsulSim {
     pathPrefix("v1" / "kv" / Remaining) { key =>
       //store kv
       put {
-        parameters('cas ?, 'acquire.?, 'release.?) { (cas, acquire, release) =>
+        parameters('cas.?, 'acquire.?, 'release.?, 'flags.?) { (cas, acquire, release, flags) =>
           entity(as[Option[String]]) { entity =>
             (acquire, release) match {
               case (Some(id1), Some(id2)) => //both acquire and release are provided => illegal
@@ -153,7 +153,7 @@ class ConsulSim {
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
               case _ =>
                 val newValue = entity.filterNot(_.isEmpty)
-                val result = keyValueStorage.createOrUpdate(key, newValue, cas.map(_.toInt), acquire, release)
+                val result = keyValueStorage.createOrUpdate(key, newValue, cas.map(_.toInt), acquire, release, flags.map(_.toInt))
                 complete(HttpEntity(ContentTypes.`application/json`, result.toString))
             }
           }
@@ -161,7 +161,7 @@ class ConsulSim {
       } ~
         //read kv
         get {
-          parameters('index ?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
+          parameters('index.?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
             val modifyIndex = index.map(_.toInt) getOrElse 0
             logger.debug(s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]")
@@ -181,7 +181,7 @@ class ConsulSim {
         } ~
         //delete kv
         delete {
-          parameters('cas ?, 'recurse.?) { (cas, recurse) =>
+          parameters('cas.?, 'recurse.?) { (cas, recurse) =>
             val recursive = recurse getOrElse false //TODO implement recursive delete
             keyValueStorage.removeKey(key)
             complete(HttpEntity(ContentTypes.`application/json`, "true"))

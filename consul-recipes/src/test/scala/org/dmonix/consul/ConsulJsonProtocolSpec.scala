@@ -89,7 +89,7 @@ class ConsulJsonProtocolSpec extends Specification {
                  |  "ModifyIndex": 200,
                  |  "LockIndex": 69,
                  |  "Key": "my-key",
-                 |  "Flags": 0,
+                 |  "Flags": 6969,
                  |  "Value": "$encoded",
                  |  "Session": "adf4238a-882b-9ddc-4a9d-5b6758e4159e"
                  |}
@@ -102,6 +102,7 @@ class ConsulJsonProtocolSpec extends Specification {
         lockIndex = 69,
         key = "my-key",
         value = Some(data),
+        flags = 6969,
         session = Some("adf4238a-882b-9ddc-4a9d-5b6758e4159e")
       )
     }

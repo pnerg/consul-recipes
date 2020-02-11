@@ -20,7 +20,7 @@ trait ConsulSpecification extends Specification {
       val key = "my-key-"+keyCreationCounter.getAndIncrement()
       val value = Option("some-value")
 
-      storage.createOrUpdate(key,value, None, None, None) === true
+      storage.createOrUpdate(key,value, None, None, None, None) === true
       storage.keyExists(key) === true
       storage.getKeyValue(key).get
     }

@@ -31,18 +31,26 @@ class KeyValueStorageSpec extends ConsulSpecification {
       val key = "my-key"
       val value = Some("my-value")
       val storage = KeyValueStorage()
-      storage.createOrUpdate(key, value, None, None, None) === true
+      storage.createOrUpdate(key, value, None, None, None, None) === true
       storage.assertKeyValue(key, value)
       storage.assertKeyExists(key)
       storage.getKeyValues.get(key) must beSome().which(_.value === value)
-      
+    }
+    "allow for adding a new key with 'Flags'" >> {
+      val key = "my-key"
+      val value = Some("my-value")
+      val storage = KeyValueStorage()
+      storage.createOrUpdate(key, value, None, None, None, Some(6969)) === true
+      storage.assertKeyValue(key, value)
+      storage.assertKeyExists(key)
+      storage.getKeyValues.get(key) must beSome().which(v => v.value === value && v.flags === 6969)
     }
     "allow for updating a key" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
       
       val newValue = Some("new-value")
-      storage.createOrUpdate(kv.key, newValue, None, None, None) === true
+      storage.createOrUpdate(kv.key, newValue, None, None, None, None) === true
       storage.assertKeyValue(kv.key, newValue)
     }
     "allow for updating a key with CAS provided the ModificationIndex has not changed" >> {
@@ -50,7 +58,7 @@ class KeyValueStorageSpec extends ConsulSpecification {
       val kv = storage.createInitialKey()
 
       val newValue = Some("new-value")
-      storage.createOrUpdate(kv.key, newValue, Some(kv.modifyIndex), None, None) === true
+      storage.createOrUpdate(kv.key, newValue, Some(kv.modifyIndex), None, None, None) === true
       storage.assertKeyValue(kv.key, newValue)
       storage.assertKeyExists(kv)
     }
@@ -59,7 +67,7 @@ class KeyValueStorageSpec extends ConsulSpecification {
       val kv = storage.createInitialKey()
 
       val newValue = Some("new-value")
-      storage.createOrUpdate(kv.key, newValue, Some(kv.modifyIndex-1), None, None) === false //setting CAS to something else than the key has simulates a changed ModificationIndex
+      storage.createOrUpdate(kv.key, newValue, Some(kv.modifyIndex-1), None, None, None) === false //setting CAS to something else than the key has simulates a changed ModificationIndex
       storage.assertKeyValue(kv.key, kv.value) //the old value shall remain
       storage.assertKeyExists(kv)
     }
@@ -96,7 +104,7 @@ class KeyValueStorageSpec extends ConsulSpecification {
       }
       //wait some time and then release the lock by updating the key
       Thread.sleep(100)
-      storage.createOrUpdate(kv.key, newValue, None, None, None) === true
+      storage.createOrUpdate(kv.key, newValue, None, None, None, None) === true
       
       //assert the future/lock has been released and we got the updated value
       Await.result(f, 2.seconds) must beSome().which(_.value == newValue)
@@ -105,41 +113,41 @@ class KeyValueStorageSpec extends ConsulSpecification {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
     }
     "allow for re-acquiring a lock on for the same session" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
     }
     "fail to acquire a lock on for the if another owner" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, Some("your-session"), None) == false
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("your-session"), None, None) == false
     }
     "allow to release a lock on if the session is the owner" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session")) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session"), None) == true
     }
     "allow to release a lock on if the session is not the owner" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, None, Some("your-session")) == false
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, None, Some("your-session"), None) == false
     }
     "fail to release a lock on a non-locked key" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session")) == false
+      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session"), None) == false
     }
   }
   

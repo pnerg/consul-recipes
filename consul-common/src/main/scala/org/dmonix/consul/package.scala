@@ -55,11 +55,12 @@ package object consul {
     * @param createIndex The ''CreateIndex'' value as stored in Consul
     * @param modifyIndex The ''ModifyIndex'' value as stored in Consul
     * @param lockIndex The ''LockIndex'' value as stored in Consul
+    * @param flags The ''Flags'' value as stored in Consul
     * @param key The name/path of the key
     * @param value The value in plain string format already Base64 decoded
     * @param session Optional owner (session ÍD) of the key
     */
-  case class KeyValue(createIndex:Int, modifyIndex:Int, lockIndex:Int, key:String, value:Option[String], session:Option[String]) {
+  case class KeyValue(createIndex:Int, modifyIndex:Int, lockIndex:Int, flags:Int, key:String, value:Option[String], session:Option[String]) {
     import spray.json._
 
     /**

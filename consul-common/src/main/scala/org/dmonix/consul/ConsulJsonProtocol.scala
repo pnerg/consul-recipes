@@ -47,7 +47,6 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
       obj.lockDelay.foreach(builder += "LockDelay" -> _.toJson)
       obj.node.foreach(builder += "Node" -> _.toJson)
       obj.behavior.foreach(builder += "Behavior" -> _.toJson)
-      //obj.checks.foreach(builder += "Checks" -> _.toJson)
       obj.ttl.foreach(builder += "TTL" -> _.toJson)
       JsObject(builder.result())
     }
@@ -71,6 +70,7 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
       builder += "CreateIndex" -> obj.createIndex.toJson
       builder += "ModifyIndex" -> obj.modifyIndex.toJson
       builder += "LockIndex" -> obj.lockIndex.toJson
+      builder += "Flags" -> obj.flags.toJson
       builder += "Key" -> obj.key.toJson
       obj.value.map(encode).foreach(builder += "Value" -> _.toJson)
       obj.session.foreach(builder += "Session" -> _.toJson)
@@ -83,6 +83,7 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
         createIndex = json.fieldValOrFail[Int]("CreateIndex"),
         modifyIndex = json.fieldValOrFail[Int]("ModifyIndex"),
         lockIndex = json.fieldValOrFail[Int]("LockIndex"),
+        flags = json.fieldValOrFail[Int]("Flags"),
         key = json.fieldValOrFail[String]("Key"),
         value = json.fieldVal[String]("Value").map(decode),
         session = json.fieldVal[String]("Session")

@@ -43,8 +43,17 @@ class ConsulSimKeyValueSpec extends ConsulSpecification with Specs2RouteTest {
         storage.assertKeyValue(key, None)
       }
     }
-    "be successful with value if the key did not exist" >> {
+    "be successful with no value using 'Flags' if the key did not exist" >> {
       val key = "foo/bar2"
+      Put("/v1/kv/"+key+"?flags=6969") ~> sim.keyValueRoute ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[String] === "true"
+        storage.assertKeyValue(key, None)
+        storage.getKeyValue(key) must beSome().which(_.flags === 6969)
+      }
+    }
+    "be successful with value if the key did not exist" >> {
+      val key = "foo/bar3"
       val value = Some("my-value")
       Put("/v1/kv/"+key, value) ~> sim.keyValueRoute ~> check {
         status shouldEqual StatusCodes.OK
