@@ -12,8 +12,8 @@ val `akka-http-version` = "10.1.11"
 val baseSettings = Seq(
   organization := "org.dmonix",
   version := "0.4.0",
-  scalaVersion := "2.12.0",
-  crossScalaVersions := Seq("2.11.12", "2.12.0"),
+  scalaVersion := "2.12.11",
+  crossScalaVersions := Seq("2.11.12", "2.12.11"),
   scalacOptions := Seq("-feature",
     "-language:postfixOps",
     "-language:implicitConversions",
