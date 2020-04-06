@@ -39,15 +39,26 @@ class ConsulWithSimSpec extends Specification with BeforeAfterAll {
   "Key/values" >> {
     "shall be successful setting a key without value" >> {
       val consul = Consul(consulHost)
-      consul.storeKeyValue("a-key", None) must beASuccessfulTry(true)
+      val key = "a-key"
+      consul.storeKeyValue(key, None) must beASuccessfulTry(true)
+      consulSim.keyValueStorage.keyExists(key) === true
+      consulSim.keyValueStorage.getKeyValue(key) must beSome.like({case KeyValue(_, _, _, _, `key`, None, None) => ok})
     }
     "shall be successful setting a key with value" >> {
       val consul = Consul(consulHost)
-      consul.storeKeyValue("another-key", Some("a-value")) must beASuccessfulTry(true)
+      val key = "another-key"
+      consul.storeKeyValue(key, Some("a-value")) must beASuccessfulTry(true)
+      consulSim.keyValueStorage.getKeyValue(key) must beSome.like({case KeyValue(_, _, _, _, `key`, Some("a-value"), None) => ok})
     }
     "shall return None for non-existing key" >> {
       val consul = Consul(consulHost)
       consul.readKeyValue("no-such-key") must beASuccessfulTry(None)
+    }
+    "shall return Some for an existing key" >> {
+      val consul = Consul(consulHost)
+      val key = "yet-another-key"
+      consulSim.keyValueStorage.createOrUpdate(key, Some("my-value"))
+      consul.readKeyValue(key) must beASuccessfulTry.like({case Some(KeyValue(_, _, _, _, `key`, Some("my-value"), None)) => ok})
     }
   }
 }

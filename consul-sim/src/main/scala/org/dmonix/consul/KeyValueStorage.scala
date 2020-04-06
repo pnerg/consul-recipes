@@ -66,6 +66,18 @@ class KeyValueStorage {
     * @return
     */
   def keyExists(key:String):Boolean = keyValues.contains(key)
+
+
+  /**
+    * Attempts to create/update the provided key
+    * @param key The name/path of the key
+    * @param value The new (optional) value
+    * @return
+    * @since 0.5.0
+    */
+  def createOrUpdate(key:String, value:Option[String]): Boolean = {
+    createOrUpdate(key, value, None, None, None, None)
+  }
   
   /**
     * Attempts to create/update the provided key
