@@ -1,7 +1,8 @@
 publishArtifact := false
 
+val componentVersion = "0.5.0"
 organization := "org.dmonix"
-version := "0.4.0"
+version := componentVersion
 scalaVersion := "2.12.8"
 crossScalaVersions := Seq("2.11.12", "2.12.8")
 
@@ -12,7 +13,7 @@ val `akka-http-version` = "10.1.11"
 
 val baseSettings = Seq(
   organization := "org.dmonix",
-  version := "0.5.0",
+  version := componentVersion,
   scalaVersion := "2.12.11",
   crossScalaVersions := Seq("2.11.12", "2.12.11"),
   scalacOptions := Seq("-feature",
