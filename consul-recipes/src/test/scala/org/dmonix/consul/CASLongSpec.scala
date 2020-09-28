@@ -27,8 +27,8 @@ class CASLongSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
   private val atomic = new AtomicInteger(0)
 
-  override def beforeAll = consulSim.start()
-  override def afterAll = consulSim.shutdown()
+  override def beforeAll():Unit = consulSim.start()
+  override def afterAll():Unit = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
   private lazy val consul = Consul(consulHost)

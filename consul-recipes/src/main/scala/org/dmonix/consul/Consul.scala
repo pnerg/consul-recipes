@@ -67,7 +67,7 @@ class Consul(httpSender:HttpSender) {
   def destroySession(sessionID:SessionID):Try[Unit] = 
     httpSender
       .put(s"/session/destroy/$sessionID")
-      .asUnit
+      .asUnit()
 
   /**
     * Attempts to renew a session in Consul.
@@ -150,7 +150,7 @@ class Consul(httpSender:HttpSender) {
   def readKeyValues(kv: GetKeyValue):Try[Option[Stream[KeyValue]]] = {
     val params = Map(
       "index" -> kv.modifyIndex,
-      "wait" -> kv.maxWait.map(_.toMillis+"ms"),
+      "wait" -> kv.maxWait.map(v => s"${v.toMillis}ms"),
       "recurse" -> (if(kv.recursive) Some(true) else None)
     ).asURLParams
 

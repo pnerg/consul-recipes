@@ -11,11 +11,11 @@ import org.specs2.specification.BeforeAfterAll
 class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
   private var candidates = Seq[Candidate]()
-  override def beforeAll = {
+  override def beforeAll():Unit = {
     candidates.foreach(_.leave())
     consulSim.start()
   }
-  override def afterAll = consulSim.shutdown()
+  override def afterAll():Unit = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
 

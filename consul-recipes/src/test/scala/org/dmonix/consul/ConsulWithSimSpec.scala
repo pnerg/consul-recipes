@@ -24,8 +24,8 @@ import org.specs2.specification.BeforeAfterAll
 class ConsulWithSimSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
 
-  override def beforeAll = consulSim.start()
-  override def afterAll = consulSim.shutdown()
+  override def beforeAll():Unit = consulSim.start()
+  override def afterAll():Unit = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
   
@@ -52,7 +52,7 @@ class ConsulWithSimSpec extends Specification with BeforeAfterAll {
     }
     "shall return None for non-existing key" >> {
       val consul = Consul(consulHost)
-      consul.readKeyValue("no-such-key") must beASuccessfulTry(None)
+      consul.readKeyValue("no-such-key") must beASuccessfulTry.like({case None => ok})
     }
     "shall return Some for an existing key" >> {
       val consul = Consul(consulHost)

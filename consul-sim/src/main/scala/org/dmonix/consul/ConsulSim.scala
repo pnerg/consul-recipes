@@ -15,7 +15,8 @@
   */
 package org.dmonix.consul
 
-import akka.actor.{ActorSystem, Terminated}
+import akka.Done
+import akka.actor.{ActorSystem, CoordinatedShutdown, Terminated}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -28,9 +29,9 @@ import org.slf4j.LoggerFactory
 import spray.json._
 
 import scala.collection._
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
-import scala.util.Success
+import scala.util.{Success, Try}
 
 
 
@@ -75,19 +76,27 @@ class ConsulSim {
 
   /**
     * Shutdown the simulator
+    * @param maxWait Maximum wait time for the simulator to properly stop
     * @return
     */
-  def shutdown(): Unit = synchronized {
-    val shutdownFuture = server.map{binding => 
-      for {
-        _ <- binding.terminate(5.seconds)
-        _ <- system.terminate()
-      } yield {
-        logger.info(s"Shutdown Consul Sim on port [${binding.localAddress.getPort}]")
+  def shutdown(maxWait:FiniteDuration = 30.seconds): Try[Done] = synchronized {
+    Try(Await.result(shutdownNonBlocking(), maxWait))
+  }
+
+  /**
+    * Shutdown the simulator
+    * @return
+    */
+  def shutdownNonBlocking(): Future[Done] = synchronized {
+    val shutdownFuture = server.map{binding =>
+      CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "shutdown-connection-pools"){
+        () =>
+          Http.get(system).shutdownAllConnectionPools().map(_=> Done)
       }
-    }.getOrElse(Future.successful(()))
+      CoordinatedShutdown(system).run(CoordinatedShutdown.unknownReason)
+    }.getOrElse(Future.successful(Done))
     server = None
-    Await.result(shutdownFuture, 30.seconds)
+    shutdownFuture
   }
 
   /**
