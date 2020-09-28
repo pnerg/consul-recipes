@@ -9,7 +9,7 @@ object Dependencies extends AutoPlugin {
     val `slf4j-api`       = "org.slf4j" % "slf4j-api" % "1.7.30"
     val `logback-classic` = "ch.qos.logback" % "logback-classic" % "1.2.3"
 
-    val `specs-core-version`   = "4.9.2"
+    val `specs-core-version`   = "4.10.3"
     val `specs2-core`          = "org.specs2" %% "specs2-core" % `specs-core-version`
     val `specs2-mock`          = "org.specs2" %% "specs2-mock" % `specs-core-version`
     val `specs2-junit`         = "org.specs2" %% "specs2-junit" % `specs-core-version`
