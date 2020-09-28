@@ -30,6 +30,7 @@ import spray.json._
 import scala.collection._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
+import scala.util.Success
 
 
 
@@ -76,12 +77,16 @@ class ConsulSim {
     * Shutdown the simulator
     * @return
     */
-  def shutdown(): Terminated = synchronized {
-    val shutdownFuture = server
-      .map(_.unbind()) //unbind the server if it is started
-      .getOrElse(Future.successful(())) //server not started, shutdown is "success"
-      .flatMap(_ => system.terminate()) //terminate the actor system
-
+  def shutdown(): Unit = synchronized {
+    val shutdownFuture = server.map{binding => 
+      for {
+        _ <- binding.terminate(5.seconds)
+        _ <- system.terminate()
+      } yield {
+        logger.info(s"Shutdown Consul Sim on port [${binding.localAddress.getPort}]")
+      }
+    }.getOrElse(Future.successful(()))
+    server = None
     Await.result(shutdownFuture, 30.seconds)
   }
 

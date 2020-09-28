@@ -15,6 +15,8 @@
   */
 package org.dmonix.consul
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.DurationInt
@@ -76,7 +78,8 @@ trait Candidate {
     * Leaves the election process.
     * Should this candidate currently be leader the leadership is released.
     * Once invoked this candidate will no longer be part of the election process, refer to ''LeaderElection.joinLeaderElection'' 
-    * to create a new candidate and re-join the election
+    * to create a new candidate and re-join the election.  
+    * This function may be called multiple times without any side-effects
     */
   def leave():Unit
 }
@@ -106,9 +109,9 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   )
   
   private val waitDuration = 60.seconds
-  private var isActive:Boolean = true
-  private var isLeaderState = attemptToTakeLeadership() //immediately try to cease leadership
-  private var modifyIndex = 0
+  @volatile private var isActive:AtomicBoolean = new AtomicBoolean(true)
+  @volatile private var isLeaderState = attemptToTakeLeadership() //immediately try to cease leadership
+  @volatile private var modifyIndex = 0
 
   logger.info(s"Session [$sessionID] joined leader election for group [$groupName], initial leader state is [$isLeaderState]")
 
@@ -117,14 +120,15 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   override def isLeader: Boolean = isLeaderState
 
   override def leave(): Unit = {
-    isActive = false
-    consul.storeKeyValue(setKey.copy(acquire = None, release = Option(sessionID), value = None)) //release the ownership, we do this even if we don't own the key doesn't matter
-    consul.destroySession(sessionID) //delete our session
-    consul.unregisterSession(sessionID)
-    if(isLeaderState) 
-      notifyUnElected()
-    isLeaderState = false
-    logger.info(s"Session [$sessionID] has left the election group [$groupName]")
+    if(isActive.compareAndSet(true, false)) {
+      consul.storeKeyValue(setKey.copy(acquire = None, release = Option(sessionID), value = None)) //release the ownership, we do this even if we don't own the key doesn't matter
+      consul.destroySession(sessionID) //delete our session
+      consul.unregisterSession(sessionID)
+      if (isLeaderState)
+        notifyUnElected()
+      isLeaderState = false
+      logger.info(s"Session [$sessionID] has left the election group [$groupName]")
+    }
   }
 
   private def attemptToTakeLeadership():Boolean = {
@@ -144,7 +148,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   
   private def waitForElectionUpdate():Unit = {
     Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration).get) //+1 to modifyIndex to block on the next value
-      .filter(_ => isActive) //fail the Future in case we're no longer active
+      .filter(_ => isActive.get()) //fail the Future in case we're no longer active
       .onComplete {
         //successful response from Consul with a key
         case Success(Some(keyValue)) =>
@@ -173,11 +177,11 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
           isLeaderState = attemptToTakeLeadership()
           waitForElectionUpdate()
         //future/try failed...do a new get on the key again
-        case Failure(ex) if isActive =>
+        case Failure(ex) if isActive.get() =>
           logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}]")
           waitForElectionUpdate()
         //future failed du to the 'filter' where we decided we're no longer active, just ignore and exit  
-        case _ if !isActive =>
+        case _ if !isActive.get() =>
       }
   }
   

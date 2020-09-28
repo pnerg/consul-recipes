@@ -1,7 +1,7 @@
 package org.dmonix.consul
 
 import java.util.concurrent.TimeUnit
-
+import scala.collection._
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
@@ -10,15 +10,18 @@ import org.specs2.specification.BeforeAfterAll
   */
 class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
-
-  override def beforeAll = consulSim.start()
+  private var candidates = Seq[Candidate]()
+  override def beforeAll = {
+    candidates.foreach(_.leave())
+    consulSim.start()
+  }
   override def afterAll = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
 
   "Single member election" >> {
     val observer = new TestObserver()
-    lazy val candidate = LeaderElection.joinLeaderElection(consulHost, "single-member", None, Some(observer)).get
+    val candidate = joinCandidate("single-member", observer)
     candidate.isLeader === true
     observer.isElected === true
     candidate.leave()
@@ -29,8 +32,8 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
     val groupName = "multi-group"
     val observer1 = new TestObserver()
     val observer2 = new TestObserver()
-    lazy val candidate1 = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer1)).get
-    lazy val candidate2 = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer2)).get
+    lazy val candidate1 = joinCandidate(groupName, observer1)
+    lazy val candidate2 = joinCandidate(groupName, observer2)
 
     observer1.blockForChange()
     candidate1.isLeader === true
@@ -52,6 +55,12 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
     
     candidate2.leave()
     ok
+  }
+  
+  private def joinCandidate(groupName:String, observer: ElectionObserver):Candidate = {
+    val candidate = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer)).get
+    candidates = candidates :+ candidate
+    candidate
   }
 
   private class TestObserver extends ElectionObserver {
