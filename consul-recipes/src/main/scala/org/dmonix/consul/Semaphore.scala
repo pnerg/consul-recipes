@@ -205,6 +205,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       rawData <- readSemaphoreInfo()  //try to read the lock data
       aggregatedData <- pruneStaleHolders(rawData) //prune any potential holders and return a mutated AggregatedData
     } yield {
+      logger.debug(s"[$sessionID] read data for [$semaphoreName] current state is [${aggregatedData.semaphoreData}]")
       //if already a holder, return true
       if(aggregatedData.isHolder(sessionID)) {
         logger.debug(s"[$sessionID] is already a holder of a permit for [$semaphoreName]")

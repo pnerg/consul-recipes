@@ -138,7 +138,7 @@ package object consul {
   case class DeleteKeyValue(key:String, compareAndSet:Option[Int] = None, recursive:Boolean = false)
 
   /**
-    * Represents the ''.semaphore'' file stored for each semaphore instance in Consul.
+    * Represents the ''.permits'' file stored for each semaphore instance in Consul.
     * @param permits The initial permits as stored in Consul
     * @param holders The sessionID's for all holders of a permission
     */

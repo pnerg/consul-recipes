@@ -182,10 +182,12 @@ class ConsulSim {
             keyValueStorage.readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
               case Some(kv) if recurse.isEmpty =>
+                logger.debug(s"Read data for [$key] [$kv]")
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
               //recursive call, return all keys on the requested path
               case _ if recurse.isDefined =>
                 val res = keyValueStorage.getKeysForPath(key)
+                logger.debug(s"Recursively read [$key] found [${res.size}] keys with [$res]")
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
               //no such key
               case _ =>
