@@ -15,17 +15,18 @@
   */
 package org.dmonix.consul
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.matcher.FutureMatchers
+
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 
 /**
   * Tests for the [[KeyValueStorage]] class
   *
   * @author Peter Nerg
   */
-class KeyValueStorageSpec extends ConsulSpecification {
-  
+class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification with FutureMatchers {
   "The key storage shall" >> {
     "allow for adding a new key" >> {
       val key = "my-key"
@@ -105,9 +106,9 @@ class KeyValueStorageSpec extends ConsulSpecification {
       //wait some time and then release the lock by updating the key
       Thread.sleep(100)
       storage.createOrUpdate(kv.key, newValue, None, None, None, None) === true
-      
+
       //assert the future/lock has been released and we got the updated value
-      Await.result(f, 2.seconds) must beSome().which(_.value == newValue)
+      f must beSome[KeyValue]().which(_.value == newValue).await
     }
     "allow for acquiring a lock on a non-locked key" >> {
       val storage = KeyValueStorage()
