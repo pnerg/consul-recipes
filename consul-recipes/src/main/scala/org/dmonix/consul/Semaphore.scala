@@ -94,7 +94,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   private val semaphorePath = "semaphores/"+semaphoreName
   private val permitFile = Semaphore.lockFile(semaphorePath)
   
-  private @volatile var sessionIDOpt:Option[SessionID] = None
+  @volatile private var sessionIDOpt:Option[SessionID] = None
 
   /**
     * The Consul session ID for this Semaphore instance

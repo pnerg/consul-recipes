@@ -16,7 +16,7 @@
 package org.dmonix.consul
 
 import akka.Done
-import akka.actor.{ActorSystem, CoordinatedShutdown, Terminated}
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -31,7 +31,7 @@ import spray.json._
 import scala.collection._
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
-import scala.util.{Success, Try}
+import scala.util.Try
 
 
 
