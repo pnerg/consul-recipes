@@ -51,21 +51,21 @@ class KeyValueStorage {
     * Get all stored key/values
     * @return
     */
-  def getKeyValues:Map[String, KeyValue] = synchronized {keyValues.toMap}
+  def getKeyValues:Map[String, KeyValue] =  keyValues.toMap
 
   /**
     * In essence a non-blocking 'readKey'
     * @param key
     * @return
     */
-  def getKeyValue(key: String):Option[KeyValue] = synchronized {keyValues.get(key)}
+  def getKeyValue(key: String):Option[KeyValue] =  keyValues.get(key)
 
   /**
     * Check if the provided key exists
     * @param key
     * @return
     */
-  def keyExists(key:String):Boolean = synchronized {keyValues.contains(key)}
+  def keyExists(key:String):Boolean =  keyValues.contains(key)
 
 
   /**
@@ -75,9 +75,7 @@ class KeyValueStorage {
     * @return
     * @since 0.5.0
     */
-  def createOrUpdate(key:String, value:Option[String]): Boolean = synchronized {
-    createOrUpdate(key, value, None, None, None, None)
-  }
+  def createOrUpdate(key:String, value:Option[String]): Boolean = createOrUpdate(key, value, None, None, None, None)
   
   /**
     * Attempts to create/update the provided key
@@ -88,7 +86,7 @@ class KeyValueStorage {
     * @param release Optional release
     * @return
     */
-  def createOrUpdate(key:String, newValue:Option[String], cas:Option[Int], acquire:Option[String], release:Option[String], flags:Option[Int]): Boolean = synchronized {
+  def createOrUpdate(key:String, newValue:Option[String], cas:Option[Int], acquire:Option[String], release:Option[String], flags:Option[Int]): Boolean = {
     val kv = getKeyValue(key)
       .map(_.copy(value = newValue))
       .getOrElse(KeyValue(createIndex = nextCreationIndex, modifyIndex = 0, lockIndex = 0, flags = flags.getOrElse(0), key = key, session = None, value = newValue))
@@ -100,7 +98,7 @@ class KeyValueStorage {
     * @param path
     * @return
     */
-  def getKeysForPath(path:String):Seq[KeyValue] = synchronized {keyValues.filterKeys(_.startsWith(path)).values.toSeq}
+  def getKeysForPath(path:String):Seq[KeyValue] =  keyValues.filterKeys(_.startsWith(path)).values.toSeq
 
   /**
     * Removes the key and releases any potential blockers
@@ -122,7 +120,7 @@ class KeyValueStorage {
     * @param wait The duration to block for
     * @return
     */
-  def readKey(key:String, index:Int, wait:FiniteDuration):Option[KeyValue] = synchronized {
+  def readKey(key:String, index:Int, wait:FiniteDuration):Option[KeyValue] = {
     getKeyValue(key).flatMap{kv =>
       if(index <= kv.modifyIndex)
         Some(kv)
