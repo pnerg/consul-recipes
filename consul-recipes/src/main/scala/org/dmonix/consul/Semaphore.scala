@@ -99,7 +99,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   /**
     * The Consul session ID for this Semaphore instance
     * @return
-    * @since 0.6.0
+    * @since 1.0.0
     */
   def sessionID:Option[String] = sessionIDOpt
   
