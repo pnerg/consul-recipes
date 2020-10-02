@@ -28,4 +28,4 @@ This way it can be used for other projects needing to perform unit testing towar
 
 ### Changed
 
-- Bug fix: Trimming responses from Consul before parsing theq as booleans, sometimes there's a 'CR' char
+- Bug fix: Trimming responses from Consul before parsing them as booleans, sometimes there's a 'CR' char

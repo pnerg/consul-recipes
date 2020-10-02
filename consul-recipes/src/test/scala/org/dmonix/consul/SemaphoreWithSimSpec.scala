@@ -26,8 +26,8 @@ import scala.concurrent.duration.DurationInt
 class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
 
-  override def beforeAll = consulSim.start()
-  override def afterAll = consulSim.shutdown()
+  override def beforeAll():Unit = consulSim.start()
+  override def afterAll():Unit = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
 

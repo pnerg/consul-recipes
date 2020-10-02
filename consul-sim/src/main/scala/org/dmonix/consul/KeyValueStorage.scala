@@ -15,6 +15,7 @@
   */
 package org.dmonix.consul
 
+import java.nio.file.{Path, Paths}
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{TimeUnit, Semaphore => jSemaphore}
 
@@ -44,28 +45,32 @@ class KeyValueStorage {
   private val creationCounter = new AtomicInteger(0)
   private val modificationCounter = new AtomicInteger(0)
 
-  private val keyValues = mutable.Map[String, KeyValue]()
-  private val blockers = mutable.Map[String, Seq[Blocker]]()
+  private val keyValues = mutable.Map[Path, KeyValue]()
+  private val blockers = mutable.Map[Path, Seq[Blocker]]()
 
+  implicit class PimpedString(s:String) {
+    def asPath:Path = Paths.get(s)
+  }
+  
   /**
     * Get all stored key/values
     * @return
     */
-  def getKeyValues:Map[String, KeyValue] = keyValues.toMap
+  def getKeyValues:Map[String, KeyValue] =  keyValues.map(kv => (kv._1.toString, kv._2)).toMap
 
   /**
     * In essence a non-blocking 'readKey'
     * @param key
     * @return
     */
-  def getKeyValue(key: String):Option[KeyValue] = keyValues.get(key)
+  def getKeyValue(key: String):Option[KeyValue] =  keyValues.get(key.asPath)
 
   /**
     * Check if the provided key exists
     * @param key
     * @return
     */
-  def keyExists(key:String):Boolean = keyValues.contains(key)
+  def keyExists(key:String):Boolean =  keyValues.contains(key.asPath)
 
 
   /**
@@ -75,9 +80,7 @@ class KeyValueStorage {
     * @return
     * @since 0.5.0
     */
-  def createOrUpdate(key:String, value:Option[String]): Boolean = {
-    createOrUpdate(key, value, None, None, None, None)
-  }
+  def createOrUpdate(key:String, value:Option[String]): Boolean = createOrUpdate(key, value, None, None, None, None)
   
   /**
     * Attempts to create/update the provided key
@@ -100,17 +103,17 @@ class KeyValueStorage {
     * @param path
     * @return
     */
-  def getKeysForPath(path:String):Seq[KeyValue] = keyValues.filterKeys(_.startsWith(path)).values.toSeq
+  def getKeysForPath(path:String):Seq[KeyValue] =  keyValues.filterKeys(_.startsWith(path)).values.toSeq
 
   /**
     * Removes the key and releases any potential blockers
     * @param key
     * @return
     */
-  def removeKey(key:String):Option[KeyValue] = {
-    val keyValue = keyValues.remove(key)
+  def removeKey(key:String):Option[KeyValue] = synchronized {
+    val keyValue = keyValues.remove(key.asPath)
     keyValue.foreach{kv =>
-      blockers.get(kv.key).foreach(_.foreach(_.semaphore.release()))
+      blockers.get(kv.key.asPath).foreach(_.foreach(_.semaphore.release()))
     }
     keyValue
   }
@@ -127,10 +130,11 @@ class KeyValueStorage {
       if(index <= kv.modifyIndex)
         Some(kv)
       else {
+        val kvPath = kv.key.asPath
         val semaphore = new java.util.concurrent.Semaphore(0)
         val blocker = Seq(Blocker(index, semaphore))
-        val seq = blockers.get(kv.key) map(_ ++ blocker) getOrElse blocker
-        blockers.put(kv.key, seq)
+        val seq = blockers.get(kvPath) map(_ ++ blocker) getOrElse blocker
+        blockers.put(kvPath, seq)
         logger.debug(s"Found key [$key] but index is [${kv.modifyIndex}], adding blocker on index [$index] with wait [${wait.toSeconds}]s")
         //hold here until the time runs out of someone updates the key
         semaphore.tryAcquire(wait.toMillis, TimeUnit.MILLISECONDS)
@@ -140,7 +144,7 @@ class KeyValueStorage {
     }
   }
 
-  private def attemptSetKey(kv: KeyValue, cas:Option[Int], acquire:Option[String], release:Option[String]): Boolean = {
+  private def attemptSetKey(kv: KeyValue, cas:Option[Int], acquire:Option[String], release:Option[String]): Boolean = synchronized {
     val passedCAS = cas.map(_ == kv.modifyIndex) getOrElse true //default to true if no CAS is provided
     def isUnlocked:Boolean = kv.session.isEmpty
     def isLockOwner(sessionID:String): Boolean = kv.session.map(_ == sessionID) getOrElse false
@@ -165,12 +169,13 @@ class KeyValueStorage {
     }
 
     res.foreach{ kv =>
-      keyValues.put(kv.key, kv)
+      val keyPath = kv.key.asPath
+      keyValues.put(keyPath, kv)
       logger.debug(s"Storing key/value [$kv]")
       //notify any lock holders that the key has changed
       //we don't care to prune used Semaphores, sure this will leak objects but for a test rig it won't matter.
       //only release those that have a 'index' <= than the ModifyIndex on the key
-      blockers.get(kv.key).foreach(_.foreach(_.releaseIfIndexReached(kv.modifyIndex)))
+      blockers.get(keyPath).foreach(_.foreach(_.releaseIfIndexReached(kv.modifyIndex)))
     }
     res.isDefined
   }

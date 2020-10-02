@@ -1,73 +1,67 @@
 package org.dmonix.consul
 
-import java.util.concurrent.TimeUnit
-
+import org.specs2.matcher.EventuallyMatchers
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
 /**
+  * Tests for the ''LeaderElection''
   * @author Peter Nerg
   */
-class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll {
+class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll with EventuallyMatchers {
   private val consulSim = ConsulSim()
-
-  override def beforeAll = consulSim.start()
-  override def afterAll = consulSim.shutdown()
+  override def beforeAll():Unit = consulSim.start()
+  override def afterAll():Unit = consulSim.shutdown()
 
   private def consulHost:ConsulHost = consulSim.consulHost.get
 
   "Single member election" >> {
     val observer = new TestObserver()
-    lazy val candidate = LeaderElection.joinLeaderElection(consulHost, "single-member", None, Some(observer)).get
-    candidate.isLeader === true
-    observer.isElected === true
-    candidate.leave()
-    ok
+    val candidate = joinCandidate("single-member", observer)
+    try {
+      candidate.isLeader must beTrue.eventually
+      observer.isElected must beTrue.eventually
+      candidate.leave()
+      ok
+    } finally {
+      candidate.leave()
+    }
   }
 
   "Multi member election" >> {
     val groupName = "multi-group"
     val observer1 = new TestObserver()
     val observer2 = new TestObserver()
-    lazy val candidate1 = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer1)).get
-    lazy val candidate2 = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer2)).get
+    lazy val candidate1 = joinCandidate(groupName, observer1)
+    lazy val candidate2 = joinCandidate(groupName, observer2)
+    try {
+      //candidate 1 joined first and should be elected
+      //candidate 2 should NOT be elected
+      candidate1.isLeader must beTrue.eventually
+      observer1.isElected must beTrue.eventually
+      candidate2.isLeader must beFalse.eventually
+      observer2.isElected must beFalse.eventually
 
-    observer1.blockForChange()
-    candidate1.isLeader === true
-    observer1.isElected === true
+      //drop the leader, force a re-election
+      candidate1.leave()
 
-    candidate2.isLeader === false
-    observer2.isElected === false
-    
-    //drop the leader, force a re-election
-    candidate1.leave()
-
-    observer1.blockForChange()
-    candidate1.isLeader === false
-    observer1.isElected === false
-
-    observer2.blockForChange()
-    candidate2.isLeader === true
-    observer2.isElected === true
-    
-    candidate2.leave()
-    ok
+      //now candidate 1 should have released leadership
+      //and candidate 2 should have become leader
+      candidate1.isLeader must beFalse.eventually
+      observer1.isElected must beFalse.eventually
+      candidate2.isLeader must beTrue.eventually
+      observer2.isElected must beTrue.eventually
+    } finally {
+      candidate1.leave()
+      candidate2.leave()
+    }
   }
+  
+  private def joinCandidate(groupName:String, observer: ElectionObserver):Candidate = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer)).get
 
   private class TestObserver extends ElectionObserver {
-    private var blocker = new java.util.concurrent.Semaphore(0)
     @volatile var isElected = false
-    def blockForChange():Unit = {
-      blocker.tryAcquire(10, TimeUnit.SECONDS)
-      blocker = new java.util.concurrent.Semaphore(0)
-    }
-   
-    private def elected(state:Boolean): Unit = {
-      isElected = state
-      blocker.release()
-    }
-    
-    override def elected():  Unit = elected(true)
-    override def unElected(): Unit = elected(false)
+    override def elected():  Unit = isElected = true
+    override def unElected(): Unit = isElected = false
   }
 }

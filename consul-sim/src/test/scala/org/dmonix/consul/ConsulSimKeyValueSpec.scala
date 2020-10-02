@@ -16,33 +16,33 @@
 package org.dmonix.consul
 
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.testkit.Specs2RouteTest
-import org.dmonix.consul.ConsulJsonProtocol._
-import spray.json._
-/**
-  * @author Peter Nerg
-  */
-class ConsulSimKeyValueSpec extends ConsulSpecification with Specs2RouteTest {
+    import akka.http.scaladsl.testkit.Specs2RouteTest
+    import org.dmonix.consul.ConsulJsonProtocol._
+    import spray.json._
+    /**
+      * @author Peter Nerg
+      */
+    class ConsulSimKeyValueSpec extends ConsulSpecification with Specs2RouteTest {
 
-  private val sim = ConsulSim()
-  private val storage = sim.keyValueStorage
+      private val sim = ConsulSim()
+      private val storage = sim.keyValueStorage
 
-  private implicit class PimpedString(string:String) {
-    def parseAsKeyValues:Stream[KeyValue] = string.parseJson match {
-      case JsArray(data) => data.toStream.map(_.convertTo[KeyValue])
-      case _ => deserializationError(s"Got unexpected response for [$string]")
-    }
-  }
-  
-  "creating a key shall" >> {
-    "be successful with no value if the key did not exist" >> {
-      val key = "foo/bar"
-      Put("/v1/kv/"+key) ~> sim.keyValueRoute ~> check {
-        status shouldEqual StatusCodes.OK
-        responseAs[String] === "true"
-        storage.assertKeyValue(key, None)
+      private implicit class PimpedString(string:String) {
+        def parseAsKeyValues:Stream[KeyValue] = string.parseJson match {
+          case JsArray(data) => data.toStream.map(_.convertTo[KeyValue])
+          case _ => deserializationError(s"Got unexpected response for [$string]")
+        }
       }
-    }
+
+      "creating a key shall" >> {
+        "be successful with no value if the key did not exist" >> {
+          val key = "foo/bar"
+          Put("/v1/kv/"+key) ~> sim.keyValueRoute ~> check {
+            status shouldEqual StatusCodes.OK
+            responseAs[String] === "true"
+            storage.assertKeyValue(key, None)
+          }
+        }
     "be successful with no value using 'Flags' if the key did not exist" >> {
       val key = "foo/bar2"
       Put("/v1/kv/"+key+"?flags=6969") ~> sim.keyValueRoute ~> check {

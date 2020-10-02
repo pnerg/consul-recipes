@@ -15,7 +15,8 @@
   */
 package org.dmonix.consul
 
-import akka.actor.{ActorSystem, Terminated}
+import akka.Done
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -28,8 +29,9 @@ import org.slf4j.LoggerFactory
 import spray.json._
 
 import scala.collection._
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
+import scala.util.Try
 
 
 
@@ -74,15 +76,27 @@ class ConsulSim {
 
   /**
     * Shutdown the simulator
+    * @param maxWait Maximum wait time for the simulator to properly stop
     * @return
     */
-  def shutdown(): Terminated = synchronized {
-    val shutdownFuture = server
-      .map(_.unbind()) //unbind the server if it is started
-      .getOrElse(Future.successful(())) //server not started, shutdown is "success"
-      .flatMap(_ => system.terminate()) //terminate the actor system
+  def shutdown(maxWait:FiniteDuration = 30.seconds): Try[Done] = synchronized {
+    Try(Await.result(shutdownNonBlocking(), maxWait))
+  }
 
-    Await.result(shutdownFuture, 30.seconds)
+  /**
+    * Shutdown the simulator
+    * @return
+    */
+  def shutdownNonBlocking(): Future[Done] = synchronized {
+    val shutdownFuture = server.map{binding =>
+      CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "shutdown-connection-pools"){
+        () =>
+          Http.get(system).shutdownAllConnectionPools().map(_=> Done)
+      }
+      CoordinatedShutdown(system).run(CoordinatedShutdown.unknownReason)
+    }.getOrElse(Future.successful(Done))
+    server = None
+    shutdownFuture
   }
 
   /**
@@ -168,10 +182,12 @@ class ConsulSim {
             keyValueStorage.readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
               case Some(kv) if recurse.isEmpty =>
+                logger.debug(s"Read data for [$key] [$kv]")
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
               //recursive call, return all keys on the requested path
               case _ if recurse.isDefined =>
                 val res = keyValueStorage.getKeysForPath(key)
+                logger.debug(s"Recursively read [$key] found [${res.size}] keys with [$res]")
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
               //no such key
               case _ =>

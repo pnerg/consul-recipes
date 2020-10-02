@@ -35,7 +35,7 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
     */
   implicit object FiniteDurationFormat extends RootJsonFormat[FiniteDuration] {
 
-    override def write(obj: FiniteDuration): JsValue = JsString(obj.toSeconds+"s")
+    override def write(obj: FiniteDuration): JsValue = JsString(s"${obj.toSeconds}s")
 
     override def read(json: JsValue): FiniteDuration = json.convertTo[String].asFiniteDuration
   }

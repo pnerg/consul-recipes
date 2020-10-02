@@ -3,19 +3,13 @@ publishArtifact := false
 val componentVersion = "0.5.0"
 organization := "org.dmonix"
 version := componentVersion
-scalaVersion := "2.12.8"
-crossScalaVersions := Seq("2.11.12", "2.12.8")
 
-val `specs-core-version` = "4.8.3"
-val `akka-version` = "2.5.29"
-
-val `akka-http-version` = "10.1.11"
 
 val baseSettings = Seq(
   organization := "org.dmonix",
   version := componentVersion,
-  scalaVersion := "2.12.11",
-  crossScalaVersions := Seq("2.11.12", "2.12.11"),
+  scalaVersion := "2.13.3",
+  crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.3"),
   scalacOptions := Seq("-feature",
     "-language:postfixOps",
     "-language:implicitConversions",
@@ -23,16 +17,16 @@ val baseSettings = Seq(
     "-deprecation",
     "-encoding", "utf8"),
   libraryDependencies ++= Seq(
-    "io.spray" %%  "spray-json"  % "1.3.5",
-    "org.slf4j" % "slf4j-api" % "1.7.30",
-    "org.specs2" %% "specs2-core" % `specs-core-version` % "test",
-    "org.specs2" %% "specs2-mock" % `specs-core-version` % "test",
-    "org.specs2" %% "specs2-junit" % `specs-core-version` % "test",
-    "org.specs2" %% "specs2-matcher-extra" % `specs-core-version` % "test",
-    "com.typesafe.akka" %% "akka-http" % `akka-http-version` % "test",
-    "com.typesafe.akka" %% "akka-actor" % `akka-version` % "test",
-    "com.typesafe.akka" %% "akka-stream" % `akka-version` % "test",
-    "ch.qos.logback" % "logback-classic" % "1.2.3" % "test"
+    `spray-json`,
+    `slf4j-api`,
+    `specs2-core` % "test",
+    `specs2-mock` % "test",
+    `specs2-junit` % "test",
+    `specs2-matcher-extra` % "test",
+    `akka-http`% "test",
+    `akka-actor` % "test",
+    `akka-stream` % "test",
+    `logback-classic` % "test"
   )
 )
 
@@ -54,11 +48,11 @@ lazy val recipes = (project in file("consul-sim"))
   .settings(
     name := "consul-sim",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % `akka-http-version`,
-      "com.typesafe.akka" %% "akka-actor" % `akka-version`,
-      "com.typesafe.akka" %% "akka-stream" % `akka-version`,
-      "com.typesafe.akka" %% "akka-stream-testkit" % `akka-version` % "test",
-      "com.typesafe.akka" %% "akka-http-testkit" % `akka-http-version` % "test"
+      `akka-http`,
+      `akka-actor`,
+      `akka-stream`,
+      `akka-stream-testkit` % "test",
+      `akka-http-testkit` % "test"
     )
   )
   .dependsOn(common)
