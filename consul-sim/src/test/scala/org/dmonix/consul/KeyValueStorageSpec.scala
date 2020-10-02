@@ -105,7 +105,7 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
       }
       //wait some time and then release the lock by updating the key
       Thread.sleep(100)
-      storage.createOrUpdate(kv.key, newValue, None, None, None, None) === true
+      storage.createOrUpdate(kv.key, newValue, None, None, None, None) ==== true
 
       //assert the future/lock has been released and we got the updated value
       f must beSome[KeyValue]().which(_.value == newValue).await
@@ -114,43 +114,64 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) === true
     }
     "allow for re-acquiring a lock on for the same session" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) === true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) === true
     }
     "fail to acquire a lock on for the if another owner" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, Some("your-session"), None, None) == false
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) === true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("your-session"), None, None) === false
     }
     "allow to release a lock on if the session is the owner" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session"), None) == true
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) === true
+      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session"), None) === true
     }
     "allow to release a lock on if the session is not the owner" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) == true
-      storage.createOrUpdate(kv.key, kv.value, None, None, Some("your-session"), None) == false
+      storage.createOrUpdate(kv.key, kv.value, None, Some("my-session"), None, None) === true
+      storage.createOrUpdate(kv.key, kv.value, None, None, Some("your-session"), None) === false
     }
     "fail to release a lock on a non-locked key" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
 
-      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session"), None) == false
+      storage.createOrUpdate(kv.key, kv.value, None, None, Some("my-session"), None) === false
+    }
+    "Return the list of key names when recursively fetching keys" >> {
+      val storage = KeyValueStorage()
+      storage.createOrUpdate("foo/schema", Some("schema-1")) === true
+      storage.createOrUpdate("foo/data", Some("data-1")) === true
+
+      storage.createOrUpdate("foo2/schema", Some("schema-2")) === true
+      storage.createOrUpdate("foo2/data", Some("data-2")) === true
+      
+      val values = storage.getKeysForPath("foo").map(_.value).flatten
+      values must contain(exactly("schema-1", "data-1"))
+
+      val values2 = storage.getKeysForPath("foo2").map(_.value).flatten
+      values2 must contain(exactly("schema-2", "data-2"))
     }
   }
-  
+  "Return an empty list when recursively fetching keys and key is not matching" >> {
+    val storage = KeyValueStorage()
+    storage.createOrUpdate("foo/schema", Some("schema-1")) === true
+    storage.createOrUpdate("foo/data", Some("data-1")) === true
+
+    //must not match the key 'foo'
+    storage.getKeysForPath("fo") must beEmpty
+  }
   
 }
