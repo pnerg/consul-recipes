@@ -1,6 +1,6 @@
 publishArtifact := false
 
-val componentVersion = "1.0.0"
+val componentVersion = "1.1.0"
 organization := "org.dmonix"
 version := componentVersion
 
