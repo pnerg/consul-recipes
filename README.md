@@ -1,5 +1,6 @@
 # Consul Recipes & Consul Unit Test Simulator
-
+![test](https://github.com/pnerg/consul-recipes/workflows/Build%20&%20Test/badge.svg)  [![codecov](https://codecov.io/gh/pnerg/consul-recipes/branch/master/graph/badge.svg?token=oIoFlTyu5A)](https://codecov.io/gh/pnerg/consul-recipes)   
+ 
 This projects hosts two libraries
 * [consul-recipes](consul-recipes/README.md) Implements the most common "recipes" on [Consul](https://www.consul.io) such as leader election and semaphore.
 * [consul-sim](consul-sim/README.md) A simple simulator (not full implementation) of some of the HTTP API's to Consul. Very useful for e.g. unit testing
@@ -10,7 +11,6 @@ As well as two test sub-projects for playing with the functionality locally.
 
 # Download
 Both libraries are cross-compiled for Scala 2.11, 2.12 and 2.13.  
-Latest version is [![consul-recipes](https://maven-badges.herokuapp.com/maven-central/org.dmonix/consul-recipes_2.12/badge.svg?style=plastic)](https://search.maven.org/search?q=consul-recipes)  
 Simply add the following dependency:
 ```
 "org.dmonix" %% "consul-recipes" % [version]
