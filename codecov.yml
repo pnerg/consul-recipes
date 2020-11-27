@@ -1,0 +1,3 @@
+ignore:
+  - "integration-election"
+  - "integration-semaphore"
