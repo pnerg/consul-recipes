@@ -119,7 +119,7 @@ It will start a small app that tries to register a semaphore and try to take a p
 Start multiple instances to make more instances to join, also try killing the instance that has a permit to see how someone else is released.
 
 # Download
-The libray is cross-compiled for Scala 2.11 and 2.12.  
+The libray is cross-compiled for Scala 2.11, 2.12 and 2.13.  
 Simply add the following dependency:
 ```
 "org.dmonix" %% "consul-recipes" % [version]

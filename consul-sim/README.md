@@ -26,8 +26,7 @@ class ConsulWithSimSpec extends Specification with BeforeAfterAll {
 For a full example refer to the test class [ConsulWithSimSpec](../consul-recipes/src/test/scala/org/dmonix/consul/ConsulWithSimSpec.scala)
 
 # Download
-The library is cross-compiled for Scala 2.11 and 2.12.  
-Latest version is [![consul-sim](https://maven-badges.herokuapp.com/maven-central/org.dmonix/consul-sim.12/badge.svg?style=plastic)](https://search.maven.org/search?q=consul-sim)  
+The library is cross-compiled for Scala 2.11, 2.12 and 2.13.  
 Simply add the following dependency:
 
 ```
