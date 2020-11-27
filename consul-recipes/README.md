@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/pnerg/consul-recipes.svg?branch=master)](https://travis-ci.org/pnerg/consul-recipes)[![codecov](https://codecov.io/gh/pnerg/consul-recipes/branch/master/graph/badge.svg)](https://codecov.io/gh/pnerg/consul-recipes)
-
 # Consul Recipes
 Implements the most common "recipes" on [Consul](https://www.consul.io) such as leader election and semaphore.
 
@@ -122,7 +120,6 @@ Start multiple instances to make more instances to join, also try killing the in
 
 # Download
 The libray is cross-compiled for Scala 2.11 and 2.12.  
-Latest version is [![consul-recipes](https://maven-badges.herokuapp.com/maven-central/org.dmonix/consul-recipes_2.12/badge.svg?style=plastic)](https://search.maven.org/search?q=consul-recipes)  
 Simply add the following dependency:
 ```
 "org.dmonix" %% "consul-recipes" % [version]
