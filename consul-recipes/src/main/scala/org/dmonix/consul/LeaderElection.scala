@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -101,6 +101,7 @@ import scala.concurrent.duration.DurationInt
   */
 private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String, sessionID:SessionID, info: Option[String], observer:Option[ElectionObserver]) extends Candidate {
   private val logger = LoggerFactory.getLogger(classOf[Candidate])
+  private val DefaultPause = 1.seconds
   
   private val setKey = SetKeyValue(
     key = s"leader-election/$groupName",
@@ -115,7 +116,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
 
   logger.info(s"Session [$sessionID] joined leader election for group [$groupName], initial leader state is [$isLeaderState]")
 
-  waitForElectionUpdate()
+  new Thread(new ElectionUpdater(), s"election-updater-$groupName").start()
 
   override def isLeader: Boolean = isLeaderState
 
@@ -146,53 +147,57 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
     }
   }
   
-  private def waitForElectionUpdate():Unit = {
-    Future(consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration).get) //+1 to modifyIndex to block on the next value
-      .filter(_ => isActive.get()) //fail the Future in case we're no longer active
-      .onComplete {
-        //successful response from Consul with a key
-        case Success(Some(keyValue)) =>
-          modifyIndex = keyValue.modifyIndex
-          logger.debug(s"Session [$sessionID] has read updated election data [$keyValue] and is in leader state [$isLeaderState]")
-          keyValue.session match {
-            //election node has no owner, fight for ownership
-            //current owner yielded or the owning session was terminated  
-            case None => 
-              isLeaderState = attemptToTakeLeadership()
-
-            //we have become owner, notify of the change...this should really not be possible
-            case Some(ownerSession) if (ownerSession == sessionID) && !isLeader =>
-              notifyElected()
-              
-            //we have lost ownership, notify of the change...a manual change in Consul can cause this
-            case Some(ownerSession) if (ownerSession != sessionID) && isLeader =>
-              notifyUnElected()
-              
-            //no change to owner state, just ignore  
-            case _ =>
-          }
-          waitForElectionUpdate()
-        case Success(None) => //got no data, file has been removed
-          //FIXME what to do in case the key is removed
-          isLeaderState = attemptToTakeLeadership()
-          waitForElectionUpdate()
-        //future/try failed...do a new get on the key again
-        case Failure(ex) if isActive.get() =>
-          logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}]")
-          waitForElectionUpdate()
-        //future failed du to the 'filter' where we decided we're no longer active, just ignore and exit  
-        case _ if !isActive.get() =>
-      }
-  }
-  
   private def notifyElected():Unit = {
     logger.info(s"Session [$sessionID] has acquired leadership in group [$groupName]")
-    observer.foreach(_.elected())
+    observer.foreach(o => Future(o.elected())) //run the notification in own future not to block
   }
   
   private def notifyUnElected():Unit = {
     logger.info(s"Session [$sessionID] has lost leadership in group [$groupName]")
-    observer.foreach(_.unElected())
+    observer.foreach(o => Future(o.unElected())) //run the notification in own future not to block
   }
-  
+
+  private class ElectionUpdater extends Runnable {
+    private var pauseOnFailure:FiniteDuration = DefaultPause
+    override def run(): Unit = {
+      while(isActive.get()) {
+        consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration) match {
+          //result is irrelevant if we're no longer active, just ignore and exit 
+          case _ if !isActive.get() => ()
+
+          case Success(Some(keyValue)) =>
+            pauseOnFailure = DefaultPause //reset the pause duration
+            modifyIndex = keyValue.modifyIndex
+            logger.debug(s"Session [$sessionID] has read updated election data [$keyValue] and is in leader state [$isLeaderState]")
+            keyValue.session match {
+              //election node has no owner, fight for ownership
+              //current owner yielded or the owning session was terminated  
+              case None =>
+                isLeaderState = attemptToTakeLeadership()
+
+              //we have become owner, notify of the change...this should really not be possible
+              case Some(ownerSession) if (ownerSession == sessionID) && !isLeader =>
+                notifyElected()
+
+              //we have lost ownership, notify of the change...a manual change in Consul can cause this
+              case Some(ownerSession) if (ownerSession != sessionID) && isLeader =>
+                notifyUnElected()
+
+              //no change to owner state, just ignore  
+              case _ =>
+            }
+          case Success(None) => //got no data, file has been removed
+            //FIXME what to do in case the key is removed
+            pauseOnFailure = DefaultPause //reset the pause duration
+            isLeaderState = attemptToTakeLeadership()
+          //future/try failed...do a new get on the key again
+          case Failure(ex) =>
+            logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}], will wait [$pauseOnFailure] before attempting again")
+            Thread.sleep(pauseOnFailure.toMillis)
+            pauseOnFailure = pauseOnFailure + 2.seconds
+        }
+      }
+    }
+  }
+
 }
