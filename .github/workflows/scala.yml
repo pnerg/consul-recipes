@@ -7,7 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Run tests
+      - name: Run cross-version tests and publishing
+        run: sbt +test +publishLocal
+      - name: Run test coverage
         run: sbt coverage test
       - name: Coverage Report
         run: sbt coverageReport
