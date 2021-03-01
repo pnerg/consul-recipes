@@ -16,7 +16,7 @@ object Dependencies extends AutoPlugin {
     val `specs2-matcher-extra` = "org.specs2" %% "specs2-matcher-extra" % `specs-core-version`
 
     val `akka-version`      = "2.5.32"
-    val `akka-http-version` = "10.1.13"
+    val `akka-http-version` = "10.1.14"
     val `akka-http`   = "com.typesafe.akka" %% "akka-http" % `akka-http-version`
     val `akka-actor`  = "com.typesafe.akka" %% "akka-actor" % `akka-version`
     val `akka-stream` = "com.typesafe.akka" %% "akka-stream" % `akka-version`
