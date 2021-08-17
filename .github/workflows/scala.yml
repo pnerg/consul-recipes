@@ -7,7 +7,7 @@ jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - name: Run cross-version tests for 2.11
         run: sbt '++ 2.11.12 test'
       - name: Run cross-version tests for 2.12
@@ -21,6 +21,6 @@ jobs:
       - name: Generate coverage report
         run: sbt coverageReport
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v2.0.2
         with:
           fail_ci_if_error: true
