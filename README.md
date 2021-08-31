@@ -2,7 +2,7 @@
 ![test](https://github.com/pnerg/consul-recipes/workflows/Build%20&%20Test/badge.svg) 
 [![codecov](https://codecov.io/gh/pnerg/consul-recipes/branch/master/graph/badge.svg?token=oIoFlTyu5A)](https://codecov.io/gh/pnerg/consul-recipes)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.dmonix/consul-recipes_2.13/badge.svg?style=plastic)](https://maven-badges.herokuapp.com/maven-central/org.dmonix/consul-recipes_2.13) 
-[![Scaladoc](http://javadoc-badge.appspot.com/org.dmonix/consul-recipes_2.13.svg?label=scaladoc)](http://javadoc-badge.appspot.com/org.dmonix/consul-recipes_2.13)
+[![javadoc](https://javadoc.io/badge2/org.dmonix/consul-recipes_2.13/javadoc.svg?label=scaladoc)](https://javadoc.io/doc/org.dmonix/consul-recipes_2.13/latest/org/dmonix/consul/index.html)
  
 This projects hosts two libraries
 * [consul-recipes](consul-recipes/README.md) Implements the most common "recipes" on [Consul](https://www.consul.io) such as leader election and semaphore.
