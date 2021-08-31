@@ -15,10 +15,8 @@
   */
 package org.dmonix.consul
 
-import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
-
+import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, ThreadFactory, TimeUnit}
 import scala.concurrent.duration.FiniteDuration
-
 import scala.collection._
 
 /**
@@ -28,7 +26,9 @@ import scala.collection._
 private[consul] trait SessionUpdater { 
   consul : Consul => 
   
-  private val scheduler = new ScheduledThreadPoolExecutor(5)
+  private val scheduler = new ScheduledThreadPoolExecutor(5, new ThreadFactory {
+    override def newThread(r: Runnable): Thread = new Thread(r, "consul-recipes-sessionupdater")
+  })
   
   private val sessions = mutable.Map[SessionID, ScheduledFuture[_]]()
 
