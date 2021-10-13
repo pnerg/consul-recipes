@@ -148,12 +148,12 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
   }
   
   private def notifyElected():Unit = {
-    logger.info("Session [{}] has acquired leadership in group [{}]", sessionID, groupName)
+    logger.info("Session [{}] has acquired leadership in group [{}]", sessionID, groupName:Any)
     observer.foreach(o => Future(o.elected())) //run the notification in own future not to block
   }
   
   private def notifyUnElected():Unit = {
-    logger.info("Session [{}] has lost leadership in group [{}]", sessionID, groupName)
+    logger.info("Session [{}] has lost leadership in group [{}]", sessionID, groupName:Any)
     observer.foreach(o => Future(o.unElected())) //run the notification in own future not to block
   }
 
@@ -168,7 +168,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
           case Success(Some(keyValue)) =>
             pauseOnFailure = DefaultPause //reset the pause duration
             modifyIndex = keyValue.modifyIndex
-            logger.debug("Session [{}] has read updated election data [{}] and is in leader state [{}]", sessionID, keyValue, isLeaderState)
+            logger.debug("Session [{}] has read updated election data [{}] and is in leader state [{}]", sessionID, keyValue, isLeaderState:Any)
             keyValue.session match {
               //election node has no owner, fight for ownership
               //current owner yielded or the owning session was terminated  
@@ -192,7 +192,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
             isLeaderState = attemptToTakeLeadership()
           //future/try failed...do a new get on the key again
           case Failure(ex) =>
-            logger.warn("Session [{}] in group [{}] failed to read election state due to [{}], will wait [{}] before attempting again", sessionID, groupName, ex.getMessage, pauseOnFailure)
+            logger.warn("Session [{}] in group [{}] failed to read election state due to [{}], will wait [{}] before attempting again", sessionID, groupName, ex.getMessage, pauseOnFailure:Any)
             Thread.sleep(pauseOnFailure.toMillis)
             pauseOnFailure = pauseOnFailure + 2.seconds
         }

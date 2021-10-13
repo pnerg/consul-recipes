@@ -178,16 +178,16 @@ class ConsulSim {
           parameters('index.?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
             val modifyIndex = index.map(_.toInt) getOrElse 0
-            logger.debug("Attempting to read [{}] with index [{}] wait [{}] and recurse [{}]", key, modifyIndex, waitDuration, recurse)
+            logger.debug("Attempting to read ["+key+"] with index ["+modifyIndex+"] wait ["+waitDuration+"] and recurse ["+recurse+"]")
             keyValueStorage.readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
               case Some(kv) if recurse.isEmpty =>
-                logger.debug("Read data for [{}] [{}]", key, kv)
+                logger.debug("Read data for [{}] [{}]", key, kv:Any)
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
               //recursive call, return all keys on the requested path
               case _ if recurse.isDefined =>
                 val res = keyValueStorage.getKeysForPath(key)
-                logger.debug("Recursively read [{}] found [{}] keys with [{}]", key, res.size, res)
+                logger.debug("Recursively read ["+key+"] found ["+res.size+"] keys with ["+res+"]")
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
               //no such key
               case _ =>

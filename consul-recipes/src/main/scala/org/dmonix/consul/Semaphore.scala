@@ -125,11 +125,11 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
               .flatMap {
                 //lock successfully updated
                 case true =>
-                  logger.debug("[{}] successfully released permit for [{}]", sessionID, semaphoreName)
+                  logger.debug("[{}] successfully released permit for [{}]", sessionID, semaphoreName:Any)
                   Success(true)
                 //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
                 case false =>
-                  logger.debug("[{}] failed to release permit for [{}] due to concurrent write, will try again", sessionID, semaphoreName)
+                  logger.debug("[{}] failed to release permit for [{}] due to concurrent write, will try again", sessionID, semaphoreName:Any)
                   release()
               }
           }
@@ -184,7 +184,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         //did not get the lock, block on the lock file and try again
         //the readLockData returns if the lockData file has changed or the waitTime expires  
         case (false, aggregatedData) if deadline.hasTimeLeft() => 
-          logger.debug("No permits left for [{}], will block on index [{}] for max [{}] waiting for an update", semaphoreName,aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft)
+          logger.debug("No permits left for [{}], will block on index [{}] for max [{}] waiting for an update", semaphoreName,aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft:Any)
           readSemaphoreInfo(aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
         //didn't get lock and we're passed the deadline, bail out
         case (false, _) =>
@@ -205,10 +205,10 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       rawData <- readSemaphoreInfo()  //try to read the lock data
       aggregatedData <- pruneStaleHolders(rawData) //prune any potential holders and return a mutated AggregatedData
     } yield {
-      logger.debug("[{}] read data for [{}] current state is [{}]", sessionID, semaphoreName, aggregatedData.semaphoreData)
+      logger.debug("[{}] read data for [{}] current state is [{}]", sessionID, semaphoreName, aggregatedData.semaphoreData:Any)
       //if already a holder, return true
       if(aggregatedData.isHolder(sessionID)) {
-        logger.debug("[{}] is already a holder of a permit for [{}]", sessionID, semaphoreName)
+        logger.debug("[{}] is already a holder of a permit for [{}]", sessionID, semaphoreName:Any)
         Success((true, aggregatedData))
       }
       //if there's enough permits left, try to take one
@@ -216,7 +216,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         //create new data ourselves as holder
         val newData = aggregatedData.semaphoreData.addHolder(sessionID)
         //attempt to write the updated lock data
-        logger.debug("[{}] attempts to acquire permit for [{}] with updated data [{}]", sessionID, semaphoreName, newData)
+        logger.debug("[{}] attempts to acquire permit for [{}] with updated data [{}]", sessionID, semaphoreName, newData:Any)
         storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
           .flatMap{
             //data written, we got the lock/semaphore
@@ -226,7 +226,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
                 .map(_ => (true, aggregatedData)) //map/return the result of the permit acquire
             //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
             case false =>
-              logger.debug("[{}] failed to write lock data for [{}] due to concurrent changes, will try again", sessionID, semaphoreName)
+              logger.debug("[{}] failed to write lock data for [{}] due to concurrent changes, will try again", sessionID, semaphoreName:Any)
               tryAcquireInternal()
           }
       }
