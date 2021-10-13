@@ -29,38 +29,38 @@ import scala.util.{Failure, Success}
   *
   * @author Peter Nerg
   */
-class ConsulSimSpec extends Specification with BeforeAfterAll{
+class ConsulSimSpec extends Specification with BeforeAfterAll {
 
   private implicit val system = ActorSystem("ConsulSimSpec")
 
-  private var url:String = null 
-  
-  implicit class PimpedFuture[T](f:Future[T]) {
+  private var url: String = null
+
+  implicit class PimpedFuture[T](f: Future[T]) {
+
     /**
       * Blocks and waits for the Future to complete then returning the result (Try) of the execution.
       * The resulting Try will be failed in case the Future failed.
       * @return The resulting Try from the Future once it has finished.
       */
-    def waitForResult:T = {
+    def waitForResult: T = {
       import scala.concurrent.ExecutionContext.Implicits.global
       import scala.concurrent.duration.DurationInt
       val secureFuture = f
         .map(Success(_))
         .recover({ case ex: Throwable => Failure(ex) })
       Await.result(secureFuture, 1.seconds) get
-    }    
+    }
   }
-  
-  private val consulSim = ConsulSim()
-  
 
-  override def beforeAll = url = "http://127.0.0.1:"+consulSim.start().port+"/v1"
+  private val consulSim = ConsulSim()
+
+  override def beforeAll = url = "http://127.0.0.1:" + consulSim.start().port + "/v1"
   override def afterAll = {
     consulSim.shutdown()
     system.terminate().waitForResult
   }
 
-  private def consulHost:ConsulHost = consulSim.consulHost.get
+  private def consulHost: ConsulHost = consulSim.consulHost.get
 
   "Managing key values" >> {
     "shall return 404 for non existing key" >> {
@@ -73,8 +73,8 @@ class ConsulSimSpec extends Specification with BeforeAfterAll{
       response.status shouldEqual StatusCodes.OK
     }
   }
-  
-  private def kvURL(key:String) = url+"/kv/"+key
-  
-  private def singleRequest(url:String):HttpResponse = Http().singleRequest(HttpRequest(uri = url)).waitForResult
+
+  private def kvURL(key: String) = url + "/kv/" + key
+
+  private def singleRequest(url: String): HttpResponse = Http().singleRequest(HttpRequest(uri = url)).waitForResult
 }

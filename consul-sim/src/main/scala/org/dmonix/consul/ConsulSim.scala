@@ -33,9 +33,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
 import scala.util.Try
 
-
-
-object ConsulSim  {
+object ConsulSim {
   def apply() = new ConsulSim()
 }
 
@@ -66,9 +64,9 @@ class ConsulSim {
     * @param port The port to listen to, defaults to 0 i.e. chosen by the host
     * @return The host/port the simulator listens to
     */
-  def start(port:Int = 0): ConsulHost = synchronized {
+  def start(port: Int = 0): ConsulHost = synchronized {
     val bindingFuture = Http().bindAndHandle(sessionRoute ~ keyValueRoute, "0.0.0.0", port)
-    val binding =  Await.result(bindingFuture, 10.seconds)
+    val binding = Await.result(bindingFuture, 10.seconds)
     server = Some(binding)
     logger.info(s"Started Consul Sim on port [${binding.localAddress.getPort}]")
     ConsulHost("localhost", binding.localAddress.getPort)
@@ -79,7 +77,7 @@ class ConsulSim {
     * @param maxWait Maximum wait time for the simulator to properly stop
     * @return
     */
-  def shutdown(maxWait:FiniteDuration = 30.seconds): Try[Done] = synchronized {
+  def shutdown(maxWait: FiniteDuration = 30.seconds): Try[Done] = synchronized {
     Try(Await.result(shutdownNonBlocking(), maxWait))
   }
 
@@ -88,13 +86,17 @@ class ConsulSim {
     * @return
     */
   def shutdownNonBlocking(): Future[Done] = synchronized {
-    val shutdownFuture = server.map{binding =>
-      CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "shutdown-connection-pools"){
-        () =>
-          Http.get(system).shutdownAllConnectionPools().map(_=> Done)
+    val shutdownFuture = server
+      .map { binding =>
+        CoordinatedShutdown(system).addTask(
+          CoordinatedShutdown.PhaseBeforeActorSystemTerminate,
+          "shutdown-connection-pools"
+        ) { () =>
+          Http.get(system).shutdownAllConnectionPools().map(_ => Done)
+        }
+        CoordinatedShutdown(system).run(CoordinatedShutdown.unknownReason)
       }
-      CoordinatedShutdown(system).run(CoordinatedShutdown.unknownReason)
-    }.getOrElse(Future.successful(Done))
+      .getOrElse(Future.successful(Done))
     server = None
     shutdownFuture
   }
@@ -103,7 +105,7 @@ class ConsulSim {
     * Returns the host/port the simulator listens to if started
     * @return
     */
-  def consulHost:Option[ConsulHost] = server.map(b => ConsulHost("localhost", b.localAddress.getPort))
+  def consulHost: Option[ConsulHost] = server.map(b => ConsulHost("localhost", b.localAddress.getPort))
 
   /**
     * ==============================
@@ -112,7 +114,7 @@ class ConsulSim {
     * ==============================
     */
   private[consul] val sessionRoute: Route =
-    pathPrefix("v1" / "session" ) {
+    pathPrefix("v1" / "session") {
       //create session
       pathPrefix("create") {
         put {
@@ -128,12 +130,12 @@ class ConsulSim {
         }
       } ~
         //destroy session
-        pathPrefix("destroy" / Remaining)  { sessionID =>
+        pathPrefix("destroy" / Remaining) { sessionID =>
           sessionStorage.removeSession(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
           complete(HttpEntity(ContentTypes.`application/json`, "true"))
         } ~
         //renew session
-        pathPrefix("renew" / Remaining)  { sessionID =>
+        pathPrefix("renew" / Remaining) { sessionID =>
           sessionStorage.getSession(sessionID) match {
             case Some(session) =>
               //FIXME update the session data
@@ -144,7 +146,6 @@ class ConsulSim {
           }
         }
     }
-
 
   /**
     * ==============================
@@ -167,7 +168,8 @@ class ConsulSim {
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
               case _ =>
                 val newValue = entity.filterNot(_.isEmpty)
-                val result = keyValueStorage.createOrUpdate(key, newValue, cas.map(_.toInt), acquire, release, flags.map(_.toInt))
+                val result =
+                  keyValueStorage.createOrUpdate(key, newValue, cas.map(_.toInt), acquire, release, flags.map(_.toInt))
                 complete(HttpEntity(ContentTypes.`application/json`, result.toString))
             }
           }
@@ -178,7 +180,9 @@ class ConsulSim {
           parameters('index.?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
             val modifyIndex = index.map(_.toInt) getOrElse 0
-            logger.debug(s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]")
+            logger.debug(
+              s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]"
+            )
             keyValueStorage.readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
               case Some(kv) if recurse.isEmpty =>

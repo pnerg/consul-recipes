@@ -37,17 +37,14 @@ class ConsulJsonProtocolSpec extends Specification {
       JsString("180s").convertTo[FiniteDuration] === duration
     }
     "shall be able to round-trip object -> json -> string -> json -> object" >> {
-      duration
-        .toJson
-        .prettyPrint
-        .parseJson
+      duration.toJson.prettyPrint.parseJson
         .convertTo[FiniteDuration] === duration
     }
   }
-  
+
   "Converting Session" >> {
     val session = Session(
-      name = Some("my-name"), 
+      name = Some("my-name"),
       lockDelay = Some(69.seconds),
       node = Some("some-node"),
       behavior = Some("release"),
@@ -63,7 +60,7 @@ class ConsulJsonProtocolSpec extends Specification {
         |   "TTL": "4140s"
         | }
       """.stripMargin.parseJson
-    
+
     "to Json shall be successful" >> {
       session.toJson === json
     }
@@ -71,15 +68,12 @@ class ConsulJsonProtocolSpec extends Specification {
       json.convertTo[Session] === session
     }
     "shall be able to round-trip object -> json -> string -> json -> object" >> {
-      session
-        .toJson
-        .prettyPrint
-        .parseJson
+      session.toJson.prettyPrint.parseJson
         .convertTo[Session] === session
     }
-    
+
   }
-  
+
   "Converting KeyValue" >> {
     val data = "Hello World!!!"
     val encoded = new String(Base64.getEncoder.encode(data.getBytes("UTF-8")), "UTF-8")

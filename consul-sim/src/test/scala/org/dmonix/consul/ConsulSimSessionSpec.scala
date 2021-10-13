@@ -28,13 +28,13 @@ class ConsulSimSessionSpec extends ConsulSpecification with Specs2RouteTest {
 
   private val sim = ConsulSim()
   private val storage = sim.sessionStorage
-  
+
   "Creating session shall be successful" >> {
     Put("/v1/session/create") ~> sim.sessionRoute ~> check {
       status shouldEqual StatusCodes.OK
       val id = responseAs[String].parseJson.fieldValOrFail[String]("ID")
       storage.assertSessionExists(id)
-    } 
+    }
   }
 
   "Destroying session shall" >> {
@@ -46,7 +46,7 @@ class ConsulSimSessionSpec extends ConsulSpecification with Specs2RouteTest {
     }
     "be successful for existing session" >> {
       val id = storage.createSession()
-      Put("/v1/session/destroy/"+id) ~> sim.sessionRoute ~> check {
+      Put("/v1/session/destroy/" + id) ~> sim.sessionRoute ~> check {
         status shouldEqual StatusCodes.OK
         storage.assertSessionNotExists(id)
       }

@@ -23,21 +23,22 @@ package org.dmonix.consul
   */
 object ManualLeaderElection extends App {
   private val blocker = new java.util.concurrent.Semaphore(0)
-  
+
   //simple observer that just prints election changes
   private val observer = new ElectionObserver {
     override def elected(): Unit = println("Elected")
     override def unElected(): Unit = println("UnElected")
   }
-  
-  private val candidate = LeaderElection.joinLeaderElection(ConsulHost("localhost"), "example-group", None, Option(observer)) get
-  
+
+  private val candidate =
+    LeaderElection.joinLeaderElection(ConsulHost("localhost"), "example-group", None, Option(observer)) get
+
   //catches shutdown of the app and makes the candidate leave the election process
   sys.addShutdownHook {
     candidate.leave()
     blocker.release()
   }
-  
+
   //hold here for the lifetime of the app
   blocker.acquire()
 }

@@ -27,14 +27,15 @@ class CASLongSpec extends Specification with BeforeAfterAll {
   private val consulSim = ConsulSim()
   private val atomic = new AtomicInteger(0)
 
-  override def beforeAll():Unit = consulSim.start()
-  override def afterAll():Unit = consulSim.shutdown()
+  override def beforeAll(): Unit = consulSim.start()
+  override def afterAll(): Unit = consulSim.shutdown()
 
-  private def consulHost:ConsulHost = consulSim.consulHost.get
+  private def consulHost: ConsulHost = consulSim.consulHost.get
   private lazy val consul = Consul(consulHost)
-  
-  private def initLong(initVal:Long = 0):CASLong = CASLong.initiate(consulHost, "long-"+atomic.incrementAndGet(), initVal).get
-  
+
+  private def initLong(initVal: Long = 0): CASLong =
+    CASLong.initiate(consulHost, "long-" + atomic.incrementAndGet(), initVal).get
+
   "performing init" >> {
     "key must have init value when created first time" >> {
       val counter = initLong(69)
@@ -72,7 +73,7 @@ class CASLongSpec extends Specification with BeforeAfterAll {
       counter.currentValue() must beASuccessfulTry.withValue(-1L)
     }
   }
-  
+
   "get current value" >> {
     "shall be successful if key exists and has a numerical value" >> {
       val counter = initLong(69)
@@ -85,7 +86,7 @@ class CASLongSpec extends Specification with BeforeAfterAll {
     "shall fail if exists but has no value" >> {
       val path = "empty-path"
       consul.storeKeyValue(path, None)
-      
+
       val counter = new CASLong(consulHost, path)
       println(counter.currentValue())
       counter.currentValue() must beAFailedTry.withThrowable[NumberFormatException]

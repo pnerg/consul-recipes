@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.{Map, mutable}
 
 object SessionStorage {
-  def apply():SessionStorage = new SessionStorage()
+  def apply(): SessionStorage = new SessionStorage()
 }
 
 /**
@@ -38,14 +38,14 @@ class SessionStorage {
     * @param session The session to add
     * @return
     */
-  def addSession(sessionID: SessionID, session:Session):Unit = synchronized{sessions.put(sessionID, session)}
+  def addSession(sessionID: SessionID, session: Session): Unit = synchronized { sessions.put(sessionID, session) }
 
   /**
     * Creates a session
     * @return The id of the created session
     */
-  def createSession():SessionID = synchronized {
-    val id = "session-"+sessionCounter.incrementAndGet()
+  def createSession(): SessionID = synchronized {
+    val id = "session-" + sessionCounter.incrementAndGet()
     addSession(id, Session())
     id
   }
@@ -54,32 +54,32 @@ class SessionStorage {
     * Get all stored sessions
     * @return
     */
-  def getSessions:Map[SessionID, Session] = synchronized{ this.sessions.toMap}
+  def getSessions: Map[SessionID, Session] = synchronized { this.sessions.toMap }
 
   /**
     * Get a specific session
     * @param sessionID The id of the session
     * @return
     */
-  def getSession(sessionID:SessionID):Option[Session] = synchronized{ sessions.get(sessionID)}
+  def getSession(sessionID: SessionID): Option[Session] = synchronized { sessions.get(sessionID) }
 
   /**
     * Removes the provided session
     * @param sessionID The id of the session
     * @return The removed session if such existed
     */
-  def removeSession(sessionID: SessionID):Option[Session] = synchronized{sessions.remove(sessionID)}
+  def removeSession(sessionID: SessionID): Option[Session] = synchronized { sessions.remove(sessionID) }
 
   /**
     * Checks if the provided session exists
     * @param sessionID
     * @return
     */
-  def sessionExists(sessionID:String):Boolean = synchronized{sessions.contains(sessionID)}
+  def sessionExists(sessionID: String): Boolean = synchronized { sessions.contains(sessionID) }
 
   /**
     * Count the stored sessions
     * @return
     */
-  def sessionCount:Int = synchronized{sessions.size}
+  def sessionCount: Int = synchronized { sessions.size }
 }
