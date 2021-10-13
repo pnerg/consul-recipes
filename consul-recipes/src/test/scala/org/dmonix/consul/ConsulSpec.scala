@@ -29,30 +29,30 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
   "Creating a session" >> {
     "shall be successful if a valid response is provided" >> {
-      val sender = mockPut {
-        case ("/session/create", _) => sessionCreatedResponse("12345")
-      }
-      
-      val consul = new Consul(sender)
-      consul.createSession(Session(name=Option("test"))) must beASuccessfulTry("12345")
-    }
-    
-    "shall be a failure if a non-valid response is provided" >> {
-      val sender = mockPut {
-        case ("/session/create", None) => failureResponse
+      val sender = mockPut { case ("/session/create", _) =>
+        sessionCreatedResponse("12345")
       }
 
       val consul = new Consul(sender)
-      consul.createSession(Session(name=Option("test"))) must beAFailedTry
+      consul.createSession(Session(name = Option("test"))) must beASuccessfulTry("12345")
+    }
+
+    "shall be a failure if a non-valid response is provided" >> {
+      val sender = mockPut { case ("/session/create", None) =>
+        failureResponse
+      }
+
+      val consul = new Consul(sender)
+      consul.createSession(Session(name = Option("test"))) must beAFailedTry
     }
   }
 
   "Destroying a session" >> {
     val sessionID = UUID.randomUUID().toString
-    val sessionPath = "/session/destroy/"+sessionID
+    val sessionPath = "/session/destroy/" + sessionID
     "shall be successful if a valid response is provided" >> {
-      val sender = mockPut {
-        case (`sessionPath`, None) => Success("true")
+      val sender = mockPut { case (`sessionPath`, None) =>
+        Success("true")
       }
 
       val consul = new Consul(sender)
@@ -60,8 +60,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be a failure if a non-valid response is provided" >> {
-      val sender = mockPut {
-        case (`sessionPath`, None) => failureResponse
+      val sender = mockPut { case (`sessionPath`, None) =>
+        failureResponse
       }
 
       val consul = new Consul(sender)
@@ -71,10 +71,10 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
   "Renewing a session" >> {
     val sessionID = UUID.randomUUID().toString
-    val sessionPath = "/session/renew/"+sessionID
+    val sessionPath = "/session/renew/" + sessionID
     "shall be successful if a valid response is provided" >> {
-      val sender = mockPut {
-        case (`sessionPath`, None) => sessionResponse(Session())
+      val sender = mockPut { case (`sessionPath`, None) =>
+        sessionResponse(Session())
       }
 
       val consul = new Consul(sender)
@@ -82,22 +82,22 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be a failure if a non-valid response is provided" >> {
-      val sender = mockPut {
-        case (`sessionPath`, None) => failureResponse
+      val sender = mockPut { case (`sessionPath`, None) =>
+        failureResponse
       }
 
       val consul = new Consul(sender)
       consul.renewSession(sessionID) must beAFailedTry
     }
   }
-  
+
   "Store key/value" >> {
     val key = "/foo/bar/my-key"
     val data = "Some data"
-    val path = "/kv/"+key
+    val path = "/kv/" + key
     "shall be successful for no data if valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, None) => trueResponse
+      val sender = mockPut { case (`path`, None) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -105,8 +105,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be successful with data if valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, Some(`data`)) => trueResponse
+      val sender = mockPut { case (`path`, Some(`data`)) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -114,8 +114,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be failure for no data if a non-valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, None) => failureResponse
+      val sender = mockPut { case (`path`, None) =>
+        failureResponse
       }
 
       val consul = new Consul(sender)
@@ -123,8 +123,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be failure with data if a non-valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, Some(`data`)) => failureResponse
+      val sender = mockPut { case (`path`, Some(`data`)) =>
+        failureResponse
       }
 
       val consul = new Consul(sender)
@@ -136,10 +136,10 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     val data = "Some data"
     val setKeyNoData = SetKeyValue(key = "/foo/bar/my-key", value = None)
     val setKeyWithData = setKeyNoData.copy(value = Some(data))
-    val path = "/kv/"+setKeyNoData.key
+    val path = "/kv/" + setKeyNoData.key
     "shall be successful for no data if valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, None) => trueResponse
+      val sender = mockPut { case (`path`, None) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -147,8 +147,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be successful with data if valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, Some(`data`)) => trueResponse
+      val sender = mockPut { case (`path`, Some(`data`)) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -157,8 +157,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
     "shall be successful with 'cas' if valid response is provided" >> {
       val p = path + "?cas=69"
-      val sender = mockPut{
-        case (`p`, Some(`data`)) => trueResponse
+      val sender = mockPut { case (`p`, Some(`data`)) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -167,8 +167,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
     "shall be successful with 'acquire' if valid response is provided" >> {
       val p = path + "?acquire=sessionID"
-      val sender = mockPut{
-        case (`p`, Some(`data`)) => trueResponse
+      val sender = mockPut { case (`p`, Some(`data`)) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -177,8 +177,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
     "shall be successful with 'acquire' if valid response is provided but the lock could not be taken" >> {
       val p = path + "?acquire=sessionID"
-      val sender = mockPut{
-        case (`p`, Some(`data`)) => falseResponse
+      val sender = mockPut { case (`p`, Some(`data`)) =>
+        falseResponse
       }
 
       val consul = new Consul(sender)
@@ -187,8 +187,8 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
     "shall be successful with 'release' if valid response is provided" >> {
       val p = path + "?release=sessionID"
-      val sender = mockPut{
-        case (`p`, Some(`data`)) => trueResponse
+      val sender = mockPut { case (`p`, Some(`data`)) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
@@ -197,17 +197,19 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
 
     "shall be successful with combining 'cas' and 'acquire' if valid response is provided" >> {
       val p = path + "?cas=69&acquire=sessionID"
-      val sender = mockPut{
-        case (`p`, Some(`data`)) => trueResponse
+      val sender = mockPut { case (`p`, Some(`data`)) =>
+        trueResponse
       }
 
       val consul = new Consul(sender)
-      consul.storeKeyValue(setKeyWithData.copy(compareAndSet = Some(69), acquire = Some("sessionID"))) must beASuccessfulTry.withValue(true)
+      consul.storeKeyValue(
+        setKeyWithData.copy(compareAndSet = Some(69), acquire = Some("sessionID"))
+      ) must beASuccessfulTry.withValue(true)
     }
 
     "shall be failure for no data if a non-valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, None) => failureResponse
+      val sender = mockPut { case (`path`, None) =>
+        failureResponse
       }
 
       val consul = new Consul(sender)
@@ -215,33 +217,33 @@ class ConsulSpec extends Specification with MockHttpSender with MockResponses {
     }
 
     "shall be failure with data if a non-valid response is provided" >> {
-      val sender = mockPut{
-        case (`path`, Some(`data`)) => failureResponse
+      val sender = mockPut { case (`path`, Some(`data`)) =>
+        failureResponse
       }
 
       val consul = new Consul(sender)
       consul.storeKeyValue(setKeyWithData) must beAFailedTry
     }
   }
-  
+
   /*
   "Read key/value" >> {
     val key = "foo/bar/my-key"
     val data = "Some data"
     val path = s"/kv/+$key?index=0&wait=0s"
 
-    "shall be successful if a valid response is provided and contain data if the key existed" >> {  
+    "shall be successful if a valid response is provided and contain data if the key existed" >> {
       val sender = mockGet{
         case `path` => getKVResponse(Some(data))
         case "/kv/foo/bar/my-key?index=0&wait=0s" => getKVResponse(Some(data))
-        case p => 
+        case p =>
           println(p)
           failureResponse
       }
       val consul = new Consul(sender)
-      consul.readKeyValue(key) must beSuccessfulTry.withValue(Some(data))      
+      consul.readKeyValue(key) must beSuccessfulTry.withValue(Some(data))
     }
   }
-  */
+   */
 
 }

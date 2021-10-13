@@ -49,7 +49,7 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
     "allow for updating a key" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
-      
+
       val newValue = Some("new-value")
       storage.createOrUpdate(kv.key, newValue, None, None, None, None) === true
       storage.assertKeyValue(kv.key, newValue)
@@ -68,7 +68,14 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
       val kv = storage.createInitialKey()
 
       val newValue = Some("new-value")
-      storage.createOrUpdate(kv.key, newValue, Some(kv.modifyIndex-1), None, None, None) === false //setting CAS to something else than the key has simulates a changed ModificationIndex
+      storage.createOrUpdate(
+        kv.key,
+        newValue,
+        Some(kv.modifyIndex - 1),
+        None,
+        None,
+        None
+      ) === false //setting CAS to something else than the key has simulates a changed ModificationIndex
       storage.assertKeyValue(kv.key, kv.value) //the old value shall remain
       storage.assertKeyExists(kv)
     }
@@ -85,7 +92,7 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
     "immediately return a read where index criteria is met" >> {
       val storage = KeyValueStorage()
       val kv = storage.createInitialKey()
-      
+
       storage.readKey(kv.key, 0, 0.seconds) must beSome().which(_.value == kv.value)
     }
     "block and return the non-changed key if duration is passed" >> {
@@ -101,7 +108,7 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
       val newValue = Some("new-value")
       val f = Future {
         val index = storage.getKeyValue(kv.key).get.modifyIndex
-        storage.readKey(kv.key, index+1, 1.seconds)
+        storage.readKey(kv.key, index + 1, 1.seconds)
       }
       //wait some time and then release the lock by updating the key
       Thread.sleep(100)
@@ -157,7 +164,7 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
 
       storage.createOrUpdate("foo2/schema", Some("schema-2")) === true
       storage.createOrUpdate("foo2/data", Some("data-2")) === true
-      
+
       val values = storage.getKeysForPath("foo").map(_.value).flatten
       values must contain(exactly("schema-1", "data-1"))
 
@@ -173,5 +180,5 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
     //must not match the key 'foo'
     storage.getKeysForPath("fo") must beEmpty
   }
-  
+
 }

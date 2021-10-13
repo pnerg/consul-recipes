@@ -22,6 +22,7 @@ import scala.util.{Failure, Success, Try}
   * Companion object to CASLong
   */
 object CASLong {
+
   /**
     * Initiates a long in Consul.
     * If the key/path does not exists in Consul the provided initial value is set.
@@ -30,10 +31,10 @@ object CASLong {
     * @param initialValue Initial value to set in case the path does not already exist (default 0)
     * @return
     */
-  def initiate(consulHost: ConsulHost, path:String, initialValue:Long = 0): Try[CASLong] = {
-      Consul(consulHost)
-        .storeKeyValue(SetKeyValue(path).withValue(initialValue.toString).withCompareAndSet(0))
-        .map(_ => new CASLong(consulHost, path))
+  def initiate(consulHost: ConsulHost, path: String, initialValue: Long = 0): Try[CASLong] = {
+    Consul(consulHost)
+      .storeKeyValue(SetKeyValue(path).withValue(initialValue.toString).withCompareAndSet(0))
+      .map(_ => new CASLong(consulHost, path))
   }
 }
 
@@ -46,7 +47,7 @@ object CASLong {
   * Generally all operations will fail if there is no such key/path or the key doesn't have a numerical value.
   * @author Peter Nerg
   */
-class CASLong(consulHost: ConsulHost, counterPath:String) {
+class CASLong(consulHost: ConsulHost, counterPath: String) {
 
   private val consul = Consul(consulHost)
 
@@ -61,7 +62,7 @@ class CASLong(consulHost: ConsulHost, counterPath:String) {
     * @param decrement The value to decrement with.
     * @return
     */
-  def decrementAndGet(decrement:Long): Try[Long] = compareAndSet(-decrement)
+  def decrementAndGet(decrement: Long): Try[Long] = compareAndSet(-decrement)
 
   /**
     * Tries to increment the counter by one and return the new value.
@@ -74,7 +75,7 @@ class CASLong(consulHost: ConsulHost, counterPath:String) {
     * @param increment The value to increment with.
     * @return
     */
-  def incrementAndGet(increment:Long): Try[Long] = compareAndSet(increment)
+  def incrementAndGet(increment: Long): Try[Long] = compareAndSet(increment)
 
   /**
     * Attempts to read the current value of the long.
@@ -87,20 +88,20 @@ class CASLong(consulHost: ConsulHost, counterPath:String) {
     * @param delta The delta value, could be negative for decrements
     * @return
     */
-  private def compareAndSet(delta:Long): Try[Long] = {
+  private def compareAndSet(delta: Long): Try[Long] = {
     @tailrec
-    def recursive():Try[Long] = get
+    def recursive(): Try[Long] = get
       .flatMap { res =>
         val (keyValue, currentValue) = res
-        val newValue = currentValue+delta
+        val newValue = currentValue + delta
         val newKeyValue = SetKeyValue(counterPath).withCompareAndSet(keyValue.modifyIndex).withValue(newValue.toString)
         consul.storeKeyValue(newKeyValue).map((_, newValue))
       } match {
-      //terminal error, could be connection failure or missing key in Consul  
+      //terminal error, could be connection failure or missing key in Consul
       case Failure(ex) => Failure(ex)
-      //key was successfully updated  
+      //key was successfully updated
       case Success((true, newValue)) => Success(newValue)
-      //could not update key, most likely reason is concurrent changes. Iterate over and try again  
+      //could not update key, most likely reason is concurrent changes. Iterate over and try again
       case Success((false, _)) => recursive()
     }
 
@@ -112,25 +113,33 @@ class CASLong(consulHost: ConsulHost, counterPath:String) {
     * This will fail if there is no such key or the key doesn't have a numerical value
     * @return
     */
-  private def get: Try[(KeyValue, Long)] = 
+  private def get: Try[(KeyValue, Long)] =
     consul
       .readKeyValue(counterPath)
-      .flatMap{
+      .flatMap {
         case Some(keyValue) => {
           keyValue.value match {
-            //the key has some kind of value, might still be garbage  
-            case Some(counterValue) => 
+            //the key has some kind of value, might still be garbage
+            case Some(counterValue) =>
               Try(counterValue.toLong) match {
                 //successfully parsed the value to a long
                 case Success(long) => Success((keyValue, long))
                 //failed to parse the value to a long, might be empty or garbage
-                case Failure(_) => Failure(new NumberFormatException(s"The key [$counterPath] has a non-numerical value [$counterValue] and cannot be converted to a number"))
+                case Failure(_) =>
+                  Failure(
+                    new NumberFormatException(
+                      s"The key [$counterPath] has a non-numerical value [$counterValue] and cannot be converted to a number"
+                    )
+                  )
               }
-            //in case there is no value on the key  
-            case None => Failure(new NumberFormatException(s"The key [$counterPath] has no value and cannot be converted to a number")) 
+            //in case there is no value on the key
+            case None =>
+              Failure(
+                new NumberFormatException(s"The key [$counterPath] has no value and cannot be converted to a number")
+              )
           }
         }
         //should really not happen as we create the key, unless deleted manually
-        case None => Failure(NoSuchKeyException(counterPath)) 
+        case None => Failure(NoSuchKeyException(counterPath))
       }
 }

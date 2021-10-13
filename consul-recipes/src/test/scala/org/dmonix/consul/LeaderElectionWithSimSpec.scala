@@ -10,10 +10,10 @@ import org.specs2.specification.BeforeAfterAll
   */
 class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll with EventuallyMatchers {
   private val consulSim = ConsulSim()
-  override def beforeAll():Unit = consulSim.start()
-  override def afterAll():Unit = consulSim.shutdown()
+  override def beforeAll(): Unit = consulSim.start()
+  override def afterAll(): Unit = consulSim.shutdown()
 
-  private def consulHost:ConsulHost = consulSim.consulHost.get
+  private def consulHost: ConsulHost = consulSim.consulHost.get
 
   "Single member election" >> {
     val observer = new TestObserver()
@@ -56,12 +56,13 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll with E
       candidate2.leave()
     }
   }
-  
-  private def joinCandidate(groupName:String, observer: ElectionObserver):Candidate = LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer)).get
+
+  private def joinCandidate(groupName: String, observer: ElectionObserver): Candidate =
+    LeaderElection.joinLeaderElection(consulHost, groupName, None, Some(observer)).get
 
   private class TestObserver extends ElectionObserver {
     @volatile var isElected = false
-    override def elected():  Unit = isElected = true
+    override def elected(): Unit = isElected = true
     override def unElected(): Unit = isElected = false
   }
 }

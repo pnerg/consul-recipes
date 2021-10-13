@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.3.4
+      - name: Check Scala style
+        run: sbt scalafmtCheckAll
       - name: Run cross-version tests for 2.11
         run: sbt '++ 2.11.12 test'
       - name: Run cross-version tests for 2.12

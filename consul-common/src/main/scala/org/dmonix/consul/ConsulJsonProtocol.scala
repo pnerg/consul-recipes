@@ -27,8 +27,8 @@ import scala.concurrent.duration.FiniteDuration
   * @author Peter Nerg
   */
 private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
-  
-  private def nonEmptyString(s:String):Boolean = Option(s).map(!_.isEmpty) getOrElse false
+
+  private def nonEmptyString(s: String): Boolean = Option(s).map(!_.isEmpty) getOrElse false
 
   /**
     * Formater to convert ''FiniteDuration'' to/from Json
@@ -39,7 +39,7 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
 
     override def read(json: JsValue): FiniteDuration = json.convertTo[String].asFiniteDuration
   }
-  
+
   implicit object SessionFormat extends RootJsonFormat[Session] {
     override def write(obj: Session): JsValue = {
       val builder = ListMap.newBuilder[String, JsValue]
@@ -64,7 +64,7 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
 
   implicit object KeyValueFormat extends RootJsonFormat[KeyValue] {
     val charset = "UTF-8"
-    def encode(s:String):String = new String(Base64.getEncoder.encode(s.getBytes(charset)), charset)
+    def encode(s: String): String = new String(Base64.getEncoder.encode(s.getBytes(charset)), charset)
     override def write(obj: KeyValue): JsValue = {
       val builder = ListMap.newBuilder[String, JsValue]
       builder += "CreateIndex" -> obj.createIndex.toJson
@@ -78,7 +78,7 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
     }
 
     override def read(json: JsValue): KeyValue = {
-      def decode(s:String):String = new String(Base64.getDecoder.decode(s), charset) 
+      def decode(s: String): String = new String(Base64.getDecoder.decode(s), charset)
       KeyValue(
         createIndex = json.fieldValOrFail[Int]("CreateIndex"),
         modifyIndex = json.fieldValOrFail[Int]("ModifyIndex"),
@@ -90,7 +90,6 @@ private[consul] object ConsulJsonProtocol extends DefaultJsonProtocol {
       )
     }
   }
-
 
   implicit object SemaphoreDataFormat extends RootJsonFormat[SemaphoreData] {
     override def write(obj: SemaphoreData): JsValue = {
