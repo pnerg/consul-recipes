@@ -27,14 +27,14 @@ import scala.util.{Failure, Success, Try}
   * @author Peter Nerg
   */
 object LeaderElection {
-  
+
   private[consul] val sessionTTL = 10.seconds
-  
+
   /**
     * Create a candidate for leader election
     * @param consulHost Consul host
     * @param groupName The election group to join
-    * @param info Optional information to be stored on the election key if/when this candidate becomes elected 
+    * @param info Optional information to be stored on the election key if/when this candidate becomes elected
     * @param observer Optional observer to receive election updates
     * @return
     */
@@ -77,8 +77,8 @@ trait Candidate {
   /**
     * Leaves the election process.
     * Should this candidate currently be leader the leadership is released.
-    * Once invoked this candidate will no longer be part of the election process, refer to ''LeaderElection.joinLeaderElection'' 
-    * to create a new candidate and re-join the election.  
+    * Once invoked this candidate will no longer be part of the election process, refer to ''LeaderElection.joinLeaderElection''
+    * to create a new candidate and re-join the election.
     * This function may be called multiple times without any side-effects
     */
   def leave():Unit
@@ -91,7 +91,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
-  * Implements the election candidate. 
+  * Implements the election candidate.
   * @param consul
   * @param groupName
   * @param sessionID
@@ -102,19 +102,19 @@ import scala.concurrent.duration.DurationInt
 private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String, sessionID:SessionID, info: Option[String], observer:Option[ElectionObserver]) extends Candidate {
   private val logger = LoggerFactory.getLogger(classOf[Candidate])
   private val DefaultPause = 1.seconds
-  
+
   private val setKey = SetKeyValue(
     key = s"leader-election/$groupName",
     value = info,
     acquire = Option(sessionID)
   )
-  
+
   private val waitDuration = 60.seconds
   @volatile private var isActive:AtomicBoolean = new AtomicBoolean(true)
   @volatile private var isLeaderState = attemptToTakeLeadership() //immediately try to cease leadership
   @volatile private var modifyIndex = 0
 
-  logger.info("Session [{}] joined leader election for group [{}], initial leader state is [{}]", sessionID, groupName, isLeaderState)
+  logger.info(s"Session [$sessionID] joined leader election for group [$groupName], initial leader state is [$isLeaderState]")
 
   new Thread(new ElectionUpdater(), s"election-updater-$groupName").start()
 
@@ -128,7 +128,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
       if (isLeaderState)
         notifyUnElected()
       isLeaderState = false
-      logger.info("Session [{}] has left the election group [{}]", sessionID, groupName)
+      logger.info(s"Session [$sessionID] has left the election group [$groupName]")
     }
   }
 
@@ -140,20 +140,20 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
       case Success(false) if isLeader =>  //lost leadership
         notifyUnElected()
         false
-      case Success(newLeaderState) => //unchanged state 
+      case Success(newLeaderState) => //unchanged state
         newLeaderState
       case _ => //failed to access Consul
         false
     }
   }
-  
+
   private def notifyElected():Unit = {
-    logger.info("Session [{}] has acquired leadership in group [{}]", sessionID, groupName:Any)
+    logger.info(s"Session [$sessionID] has acquired leadership in group [$groupName]")
     observer.foreach(o => Future(o.elected())) //run the notification in own future not to block
   }
-  
+
   private def notifyUnElected():Unit = {
-    logger.info("Session [{}] has lost leadership in group [{}]", sessionID, groupName:Any)
+    logger.info(s"Session [$sessionID] has lost leadership in group [$groupName]")
     observer.foreach(o => Future(o.unElected())) //run the notification in own future not to block
   }
 
@@ -162,16 +162,16 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
     override def run(): Unit = {
       while(isActive.get()) {
         consul.readKeyValueWhenChanged(setKey.key, modifyIndex+1, waitDuration) match {
-          //result is irrelevant if we're no longer active, just ignore and exit 
+          //result is irrelevant if we're no longer active, just ignore and exit
           case _ if !isActive.get() => ()
 
           case Success(Some(keyValue)) =>
             pauseOnFailure = DefaultPause //reset the pause duration
             modifyIndex = keyValue.modifyIndex
-            logger.debug("Session [{}] has read updated election data [{}] and is in leader state [{}]", sessionID, keyValue, isLeaderState:Any)
+            logger.debug(s"Session [$sessionID] has read updated election data [$keyValue] and is in leader state [$isLeaderState]")
             keyValue.session match {
               //election node has no owner, fight for ownership
-              //current owner yielded or the owning session was terminated  
+              //current owner yielded or the owning session was terminated
               case None =>
                 isLeaderState = attemptToTakeLeadership()
 
@@ -183,7 +183,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
               case Some(ownerSession) if (ownerSession != sessionID) && isLeader =>
                 notifyUnElected()
 
-              //no change to owner state, just ignore  
+              //no change to owner state, just ignore
               case _ =>
             }
           case Success(None) => //got no data, file has been removed
@@ -192,7 +192,7 @@ private class CandidateImpl(consul:Consul with SessionUpdater, groupName:String,
             isLeaderState = attemptToTakeLeadership()
           //future/try failed...do a new get on the key again
           case Failure(ex) =>
-            logger.warn("Session [{}] in group [{}] failed to read election state due to [{}], will wait [{}] before attempting again", sessionID, groupName, ex.getMessage, pauseOnFailure:Any)
+            logger.warn(s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}], will wait [$pauseOnFailure] before attempting again")
             Thread.sleep(pauseOnFailure.toMillis)
             pauseOnFailure = pauseOnFailure + 2.seconds
         }

@@ -36,7 +36,7 @@ object Semaphore {
     def validHolderIDs:Set[SessionID] = validMemberFiles.map(_.session).flatten.toSet
     def isHolder(sessionID: SessionID):Boolean = validHolderIDs.contains(sessionID)
   }
-  
+
   /**
     * Creates a Semaphore with the provided number of permits
     * @param consulHost Consul host
@@ -56,14 +56,14 @@ object Semaphore {
           .map(_ => new Semaphore(consul, semaphoreName))
       }
   }
-  
+
   private def lockFile(path:String) = path + "/" + permitFileName
   private[consul] implicit class RichKeyValue(kv: KeyValue) {
     def isPermitFile:Boolean = kv.key.endsWith(permitFileName)
   }
 
   /**
-    * Destroys all data stored in Consul for a Semaphore.  
+    * Destroys all data stored in Consul for a Semaphore.
     * Purpose is to clean out stale data.
     * @param consulHost Consul host
     * @param semaphoreName The name to use for the Semaphore in Consul
@@ -78,13 +78,13 @@ object Semaphore {
 import Semaphore._
 
 /**
-  * A semaphore is a construction to control access to a common resource in a concurrent system.  
-  * The semaphore in this library allows for creation of a distributed lock.   
-  * In principle a semaphore is initiated with ''1..n'' permits, instances of a semaphore then try to acquire one permit either succeeding or failing in case there are no more permits left to take.  
-  * The simplest form is a binary semaphore which has only one permit thus only allowing a single instance to acquire a permit.  
-  * Semaphores are traditionally used to control access to a protected source like a database or some task that only should be executed by a single process.     
+  * A semaphore is a construction to control access to a common resource in a concurrent system.
+  * The semaphore in this library allows for creation of a distributed lock.
+  * In principle a semaphore is initiated with ''1..n'' permits, instances of a semaphore then try to acquire one permit either succeeding or failing in case there are no more permits left to take.
+  * The simplest form is a binary semaphore which has only one permit thus only allowing a single instance to acquire a permit.
+  * Semaphores are traditionally used to control access to a protected source like a database or some task that only should be executed by a single process.
   *
-  * Each instance of the Semaphore class can hold exactly 0 or 1 permit thus invoking any of the ''tryAcquire'' functions multiple times will not acquire additional permits.
+  * Each instance of the Semaphore class can hold exactly 0 or 1 permit thus invoking any of the ''tryAcquire'' functions mulitple times will not acquire additional permits.
   *
   * @author Peter Nerg
   */
@@ -93,7 +93,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
 
   private val semaphorePath = "semaphores/"+semaphoreName
   private val permitFile = Semaphore.lockFile(semaphorePath)
-  
+
   @volatile private var sessionIDOpt:Option[SessionID] = None
 
   /**
@@ -102,7 +102,7 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
     * @since 1.0.0
     */
   def sessionID:Option[String] = sessionIDOpt
-  
+
   /**
     * Attempts to release a permit.
     * If this instance is not holding a permit this function call does nothing
@@ -125,11 +125,11 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
               .flatMap {
                 //lock successfully updated
                 case true =>
-                  logger.debug("[{}] successfully released permit for [{}]", sessionID, semaphoreName:Any)
+                  logger.debug(s"[$sessionID] successfully released permit for [$semaphoreName]")
                   Success(true)
                 //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
                 case false =>
-                  logger.debug("[{}] failed to release permit for [{}] due to concurrent write, will try again", sessionID, semaphoreName:Any)
+                  logger.debug(s"[$sessionID] failed to release permit for [$semaphoreName] due to concurrent write, will try again")
                   release()
               }
           }
@@ -143,14 +143,14 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   }
 
   /**
-    * Destroys all data for the semaphore. 
+    * Destroys all data for the semaphore.
     * Any instances blocking for a permit will be released and return as ''Failure'',
     * @return
     */
-  def destroy():Try[Boolean] = release().flatMap(_ => consul.deleteKeyValueRecursive("semaphores/"+semaphoreName)) 
-  
+  def destroy():Try[Boolean] = release().flatMap(_ => consul.deleteKeyValueRecursive("semaphores/"+semaphoreName))
+
   /**
-    * Attempts to acquire a permit without blocking.  
+    * Attempts to acquire a permit without blocking.
     * If this instance is already holding a permit no further permits are taken
     * @return ''Success'' if managed to access Consul, then ''true'' if a permit was acquired.
     */
@@ -159,9 +159,9 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
   /**
     * Attempts to acquire a permit blocking if necessary.
     * If this instance is already holding a permit no further permits are taken
-    * In practice this invokes 
+    * In practice this invokes
     * {{{
-    * tryAcquire(Deadline.now + maxWait) 
+    * tryAcquire(Deadline.now + maxWait)
     * }}}
     * @param maxWait The maximum time to block for a permit
     * @return ''Success'' if managed to access Consul, then ''true'' if a permit was acquired.
@@ -179,22 +179,22 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
     if(deadline.hasTimeLeft()) {
       tryAcquireInternal().flatMap {
         //got the lock, return
-        case (true, _) => 
+        case (true, _) =>
           Success(true)
         //did not get the lock, block on the lock file and try again
-        //the readLockData returns if the lockData file has changed or the waitTime expires  
-        case (false, aggregatedData) if deadline.hasTimeLeft() => 
-          logger.debug("No permits left for [{}], will block on index [{}] for max [{}] waiting for an update", semaphoreName,aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft:Any)
+        //the readLockData returns if the lockData file has changed or the waitTime expires
+        case (false, aggregatedData) if deadline.hasTimeLeft() =>
+          logger.debug(s"No permits left for [$semaphoreName], will block on index [${aggregatedData.semaphoreKeyFile.modifyIndex+1}] for max [${deadline.timeLeft}] waiting for an update")
           readSemaphoreInfo(aggregatedData.semaphoreKeyFile.modifyIndex+1, deadline.timeLeft).flatMap{ _ => tryAcquire(deadline)}
         //didn't get lock and we're passed the deadline, bail out
         case (false, _) =>
-          logger.debug("Failed to acquire permit for [{}] within the required time frame", semaphoreName)
+          logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
           Success(false)
       }
     }
-    //we've reached the max wait time, bail out  
+    //we've reached the max wait time, bail out
     else {
-      logger.debug("Failed to acquire permit for [{}] within the required time frame", semaphoreName)
+      logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
       Success(false)
     }
   }
@@ -205,10 +205,10 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
       rawData <- readSemaphoreInfo()  //try to read the lock data
       aggregatedData <- pruneStaleHolders(rawData) //prune any potential holders and return a mutated AggregatedData
     } yield {
-      logger.debug("[{}] read data for [{}] current state is [{}]", sessionID, semaphoreName, aggregatedData.semaphoreData:Any)
+      logger.debug(s"[$sessionID] read data for [$semaphoreName] current state is [${aggregatedData.semaphoreData}]")
       //if already a holder, return true
       if(aggregatedData.isHolder(sessionID)) {
-        logger.debug("[{}] is already a holder of a permit for [{}]", sessionID, semaphoreName:Any)
+        logger.debug(s"[$sessionID] is already a holder of a permit for [$semaphoreName]")
         Success((true, aggregatedData))
       }
       //if there's enough permits left, try to take one
@@ -216,27 +216,27 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         //create new data ourselves as holder
         val newData = aggregatedData.semaphoreData.addHolder(sessionID)
         //attempt to write the updated lock data
-        logger.debug("[{}] attempts to acquire permit for [{}] with updated data [{}]", sessionID, semaphoreName, newData:Any)
+        logger.debug(s"[$sessionID] attempts to acquire permit for [$semaphoreName] with updated data [$newData]")
         storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
           .flatMap{
             //data written, we got the lock/semaphore
             case true =>
-              logger.debug(s"[{}] successfully acquired permit for [{}]", sessionID, semaphoreName)
+              logger.debug(s"[$sessionID] successfully acquired permit for [$semaphoreName]")
               writeOwnMemberFile(sessionID) //as we acquired the lock we must write our own member/lockholder file
                 .map(_ => (true, aggregatedData)) //map/return the result of the permit acquire
             //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
             case false =>
-              logger.debug("[{}] failed to write lock data for [{}] due to concurrent changes, will try again", sessionID, semaphoreName:Any)
+              logger.debug(s"[$sessionID] failed to write lock data for [$semaphoreName] due to concurrent changes, will try again")
               tryAcquireInternal()
           }
       }
-      //not enough permits left, bail out  
+      //not enough permits left, bail out
       else {
-        logger.debug("[{}] could not acquire permit to [{}] due to lack of permits", sessionID, semaphoreName)
+        logger.debug(s"[$sessionID] could not acquire permit to [$semaphoreName] due to lack of permits")
         Success((false, aggregatedData))
-      } 
+      }
     }).flatten
-      
+
   }
 
   private def writeOwnMemberFile(sessionID: SessionID):Try[Unit] = {
@@ -246,15 +246,15 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
         case true => Success(())
         //should really not happen as we use our own sessionID as key
         case false => Failure(new IllegalStateException(s"Failed to create path [${semaphorePath+"/"+sessionID}] cannot join in Semaphore group"))
-    }
+      }
   }
-  
+
   private def storeLockData(semaphoreData: SemaphoreData, modifyIndex:Int):Try[Boolean] =
     consul
       .storeKeyValue(SetKeyValue(permitFile, semaphoreData.toJson).withCompareAndSet(modifyIndex))
 
   /**
-    * Attempts to the read the ''.lock'' file for the Semaphore 
+    * Attempts to the read the ''.lock'' file for the Semaphore
     * @param modifyIndex Optional ModifyIndex, used if blocking for change on the file
     * @param maxWait Optional waitTime, used with the modifyIndex when blocking for a change
     * @return
@@ -275,36 +275,36 @@ class Semaphore(consul:Consul with SessionUpdater, semaphoreName:String) {
     }).flatten
   }
 
-  private def readMemberFiles:Try[Stream[KeyValue]] = 
+  private def readMemberFiles:Try[Stream[KeyValue]] =
     consul.readKeyValueRecursive(semaphorePath)
       .map(_.getOrElse(Stream.empty))
-       .map(_.filterNot(_.isPermitFile))
-  
+      .map(_.filterNot(_.isPermitFile))
+
   private def getOrCreateSession():Try[SessionID] =
     sessionIDOpt.asTry()
-        .recoverWith { case _ =>
-          consul.createSession(Session(name = Option(semaphoreName), ttl = Option(sessionTTL))) match {
-            case Success(sessionID) =>
-              sessionIDOpt = Some(sessionID)
-              consul.registerSession(sessionID, sessionTTL)
-              logger.debug("Created session [{}] for [{}]", sessionID, semaphoreName)
-              Success(sessionID)
-            case f@Failure(_) => f
-          }
+      .recoverWith { case _ =>
+        consul.createSession(Session(name = Option(semaphoreName), ttl = Option(sessionTTL))) match {
+          case Success(sessionID) =>
+            sessionIDOpt = Some(sessionID)
+            consul.registerSession(sessionID, sessionTTL)
+            logger.debug(s"Created session [$sessionID] for [$semaphoreName]")
+            Success(sessionID)
+          case f@Failure(_) => f
         }
-  
+      }
+
   private def memberFile(sessionID: SessionID):String = semaphorePath + "/" +sessionID
 
   /**
     * Finds if there are any stale sessions registered as holders on the ''.semaphore'' file.
-    * This is done by comparing the sessions in the file with the session files in the same directory.  
+    * This is done by comparing the sessions in the file with the session files in the same directory.
     * Should there be a mismatch it means that an application has crashed and Consul has reaped the session file
     * @return
     */
   private def pruneStaleHolders(aggregatedData: AggregatedData):Try[AggregatedData] = {
     //any member file without owner is a sign of a session that has died and orphaned the file, nuke it
     aggregatedData.staleMemberFiles.foreach {kv =>
-      logger.warn("Found member file [{}] without owner for [{}], this is the mark of a dead session will delete it", kv.key, semaphoreName)
+      logger.warn(s"Found member file [${kv.key}] without owner for [$semaphoreName], this is the mark of a dead session will delete it")
       consul.deleteKeyValue(kv.key)
     }
     //set the valid holders

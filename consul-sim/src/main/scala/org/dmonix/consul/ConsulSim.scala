@@ -60,7 +60,7 @@ class ConsulSim {
 
   /** The internal key/value storage */
   val keyValueStorage = KeyValueStorage()
-  
+
   /**
     * Starts the simulator on the designated port
     * @param port The port to listen to, defaults to 0 i.e. chosen by the host
@@ -70,7 +70,7 @@ class ConsulSim {
     val bindingFuture = Http().bindAndHandle(sessionRoute ~ keyValueRoute, "0.0.0.0", port)
     val binding =  Await.result(bindingFuture, 10.seconds)
     server = Some(binding)
-    logger.info("Started Consul Sim on port [{}]", binding.localAddress.getPort)
+    logger.info(s"Started Consul Sim on port [${binding.localAddress.getPort}]")
     ConsulHost("localhost", binding.localAddress.getPort)
   }
 
@@ -123,13 +123,13 @@ class ConsulSim {
                        | "ID": "$sessionID"
                        |}
             """.stripMargin
-          logger.debug("Created session [{}]", sessionID)
+          logger.debug(s"Created session [$sessionID]")
           complete(HttpEntity(ContentTypes.`application/json`, rsp))
         }
       } ~
         //destroy session
         pathPrefix("destroy" / Remaining)  { sessionID =>
-          sessionStorage.removeSession(sessionID).foreach(_ => logger.debug("Destroyed session [{}]", sessionID))
+          sessionStorage.removeSession(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
           complete(HttpEntity(ContentTypes.`application/json`, "true"))
         } ~
         //renew session
@@ -137,7 +137,7 @@ class ConsulSim {
           sessionStorage.getSession(sessionID) match {
             case Some(session) =>
               //FIXME update the session data
-              logger.debug("Renewed session [{}]", sessionID)
+              logger.debug(s"Renewed session [$sessionID]")
               complete(HttpEntity(ContentTypes.`application/json`, session.toJson.prettyPrint))
             case None =>
               complete(StatusCodes.NotFound, s"Session id '$sessionID' not found")
@@ -178,16 +178,16 @@ class ConsulSim {
           parameters('index.?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
             val modifyIndex = index.map(_.toInt) getOrElse 0
-            logger.debug("Attempting to read ["+key+"] with index ["+modifyIndex+"] wait ["+waitDuration+"] and recurse ["+recurse+"]")
+            logger.debug(s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]")
             keyValueStorage.readKey(key, modifyIndex, waitDuration) match {
               //non-recursive call return the found key
               case Some(kv) if recurse.isEmpty =>
-                logger.debug("Read data for [{}] [{}]", key, kv:Any)
+                logger.debug(s"Read data for [$key] [$kv]")
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
               //recursive call, return all keys on the requested path
               case _ if recurse.isDefined =>
                 val res = keyValueStorage.getKeysForPath(key)
-                logger.debug("Recursively read ["+key+"] found ["+res.size+"] keys with ["+res+"]")
+                logger.debug(s"Recursively read [$key] found [${res.size}] keys with [$res]")
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
               //no such key
               case _ =>
@@ -205,6 +205,3 @@ class ConsulSim {
         }
     }
 }
-
-
-
