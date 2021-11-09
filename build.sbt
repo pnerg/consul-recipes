@@ -7,14 +7,17 @@ version := componentVersion
 val baseSettings = Seq(
   organization := "org.dmonix",
   version := componentVersion,
-  scalaVersion := "2.13.4",
-  crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.4"),
-  scalacOptions := Seq("-feature",
+  scalaVersion := "2.13.7",
+  crossScalaVersions := Seq("2.11.12", "2.12.12", "2.13.7"),
+  scalacOptions := Seq(
+    "-feature",
     "-language:postfixOps",
     "-language:implicitConversions",
     "-unchecked",
     "-deprecation",
-    "-encoding", "utf8"),
+    "-encoding",
+    "utf8"
+  ),
   libraryDependencies ++= Seq(
     `spray-json`,
     `slf4j-api`,
@@ -22,7 +25,7 @@ val baseSettings = Seq(
     `specs2-mock` % "test",
     `specs2-junit` % "test",
     `specs2-matcher-extra` % "test",
-    `akka-http`% "test",
+    `akka-http` % "test",
     `akka-actor` % "test",
     `akka-stream` % "test",
     `logback-classic` % "test"
@@ -37,7 +40,7 @@ val integrationSettings = Seq(
   fork := true,
   libraryDependencies ++= Seq(
     `logback-classic`
-  )  
+  )
 )
 
 // ======================================================
@@ -87,7 +90,6 @@ lazy val integrationElection = (project in file("integration-election"))
   )
   .dependsOn(recipes)
 
-
 // ======================================================
 // Only used to run local integration testing for the Semaphore
 // ======================================================
@@ -98,4 +100,3 @@ lazy val integrationSemaphore = (project in file("integration-semaphore"))
     mainClass in (Compile, run) := Some("org.dmonix.consul.ManualSemaphore")
   )
   .dependsOn(recipes)
-
