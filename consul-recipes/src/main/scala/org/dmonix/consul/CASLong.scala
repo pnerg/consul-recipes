@@ -97,11 +97,11 @@ class CASLong(consulHost: ConsulHost, counterPath: String) {
         val newKeyValue = SetKeyValue(counterPath).withCompareAndSet(keyValue.modifyIndex).withValue(newValue.toString)
         consul.storeKeyValue(newKeyValue).map((_, newValue))
       } match {
-      //terminal error, could be connection failure or missing key in Consul
+      // terminal error, could be connection failure or missing key in Consul
       case Failure(ex) => Failure(ex)
-      //key was successfully updated
+      // key was successfully updated
       case Success((true, newValue)) => Success(newValue)
-      //could not update key, most likely reason is concurrent changes. Iterate over and try again
+      // could not update key, most likely reason is concurrent changes. Iterate over and try again
       case Success((false, _)) => recursive()
     }
 
@@ -119,12 +119,12 @@ class CASLong(consulHost: ConsulHost, counterPath: String) {
       .flatMap {
         case Some(keyValue) => {
           keyValue.value match {
-            //the key has some kind of value, might still be garbage
+            // the key has some kind of value, might still be garbage
             case Some(counterValue) =>
               Try(counterValue.toLong) match {
-                //successfully parsed the value to a long
+                // successfully parsed the value to a long
                 case Success(long) => Success((keyValue, long))
-                //failed to parse the value to a long, might be empty or garbage
+                // failed to parse the value to a long, might be empty or garbage
                 case Failure(_) =>
                   Failure(
                     new NumberFormatException(
@@ -132,14 +132,14 @@ class CASLong(consulHost: ConsulHost, counterPath: String) {
                     )
                   )
               }
-            //in case there is no value on the key
+            // in case there is no value on the key
             case None =>
               Failure(
                 new NumberFormatException(s"The key [$counterPath] has no value and cannot be converted to a number")
               )
           }
         }
-        //should really not happen as we create the key, unless deleted manually
+        // should really not happen as we create the key, unless deleted manually
         case None => Failure(NoSuchKeyException(counterPath))
       }
 }

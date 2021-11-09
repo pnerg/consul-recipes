@@ -28,10 +28,10 @@ object ManualSemaphore extends App {
   private val blocker = new java.util.concurrent.Semaphore(0)
   private val semaphore = Semaphore(ConsulHost("localhost"), "example-semaphore", 1).get
 
-  //catches shutdown of the app and releases any potential permits
+  // catches shutdown of the app and releases any potential permits
   sys.addShutdownHook {
-    //try this to force a destruction of the semaphore, will fail all those blocking/waiting for a permit
-    //semaphore.destroy()
+    // try this to force a destruction of the semaphore, will fail all those blocking/waiting for a permit
+    // semaphore.destroy()
     semaphore.release()
     blocker.release()
   }
@@ -44,7 +44,7 @@ object ManualSemaphore extends App {
     case Failure(ex) => ex.printStackTrace()
   }
 
-  //hold here for the lifetime of the app
+  // hold here for the lifetime of the app
   blocker.acquire()
 
 }

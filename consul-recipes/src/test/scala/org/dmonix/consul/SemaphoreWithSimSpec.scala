@@ -40,7 +40,7 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
       semaphore.tryAcquire() must beASuccessfulTry(true)
       semaphore.tryAcquire() must beASuccessfulTry(
         true
-      ) //second acquire shall immediately return true as we already hold a permit
+      ) // second acquire shall immediately return true as we already hold a permit
       semaphore.release() must beASuccessfulTry(true)
     }
     "shall acquire successfully with wait if there are permits" >> {
@@ -48,7 +48,7 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
       semaphore.tryAcquire(5.seconds) must beASuccessfulTry(true)
       semaphore.tryAcquire(5.seconds) must beASuccessfulTry(
         true
-      ) //second acquire shall immediately return true as we already hold a permit
+      ) // second acquire shall immediately return true as we already hold a permit
       semaphore.release() must beASuccessfulTry(true)
     }
   }
@@ -60,17 +60,17 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
     val s2 = Semaphore(consulHost, name, permits).get
     val s3 = Semaphore(consulHost, name, permits).get
 
-    //only s1 should successfully acquire
+    // only s1 should successfully acquire
     s1.tryAcquire() must beASuccessfulTry(true)
     s2.tryAcquire() must beASuccessfulTry(false)
     s3.tryAcquire() must beASuccessfulTry(false)
 
-    //release s1 and s2 should successfully acquire
+    // release s1 and s2 should successfully acquire
     s1.release() must beASuccessfulTry(true)
     s2.tryAcquire() must beASuccessfulTry(true)
     s3.tryAcquire() must beASuccessfulTry(false)
 
-    //release s2 and s3 should successfully acquire
+    // release s2 and s3 should successfully acquire
     s2.release() must beASuccessfulTry(true)
     s3.tryAcquire() must beASuccessfulTry(true)
 
@@ -84,17 +84,17 @@ class SemaphoreWithSimSpec extends Specification with BeforeAfterAll {
     val s2 = Semaphore(consulHost, name, permits).get
     val s3 = Semaphore(consulHost, name, permits).get
 
-    //both s1 and s2 should successfully acquire
+    // both s1 and s2 should successfully acquire
     s1.tryAcquire() must beASuccessfulTry(true)
     s2.tryAcquire() must beASuccessfulTry(true)
     s3.tryAcquire() must beASuccessfulTry(false)
 
-    //release s1 and s3 should successfully acquire (s2 should still be ok)
+    // release s1 and s3 should successfully acquire (s2 should still be ok)
     s1.release() must beASuccessfulTry(true)
     s2.tryAcquire() must beASuccessfulTry(true)
     s3.tryAcquire() must beASuccessfulTry(true)
 
-    //release s2 and s3 should still be ok
+    // release s2 and s3 should still be ok
     s2.release() must beASuccessfulTry(true)
     s3.tryAcquire() must beASuccessfulTry(true)
 

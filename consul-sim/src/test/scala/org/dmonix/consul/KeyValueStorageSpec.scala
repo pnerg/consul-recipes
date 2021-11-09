@@ -75,8 +75,8 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
         None,
         None,
         None
-      ) === false //setting CAS to something else than the key has simulates a changed ModificationIndex
-      storage.assertKeyValue(kv.key, kv.value) //the old value shall remain
+      ) === false // setting CAS to something else than the key has simulates a changed ModificationIndex
+      storage.assertKeyValue(kv.key, kv.value) // the old value shall remain
       storage.assertKeyExists(kv)
     }
     "allow for deleting non-existing key" >> {
@@ -110,11 +110,11 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
         val index = storage.getKeyValue(kv.key).get.modifyIndex
         storage.readKey(kv.key, index + 1, 1.seconds)
       }
-      //wait some time and then release the lock by updating the key
+      // wait some time and then release the lock by updating the key
       Thread.sleep(100)
       storage.createOrUpdate(kv.key, newValue, None, None, None, None) ==== true
 
-      //assert the future/lock has been released and we got the updated value
+      // assert the future/lock has been released and we got the updated value
       f must beSome[KeyValue]().which(_.value == newValue).await
     }
     "allow for acquiring a lock on a non-locked key" >> {
@@ -177,7 +177,7 @@ class KeyValueStorageSpec(implicit ee: ExecutionEnv) extends ConsulSpecification
     storage.createOrUpdate("foo/schema", Some("schema-1")) === true
     storage.createOrUpdate("foo/data", Some("data-1")) === true
 
-    //must not match the key 'foo'
+    // must not match the key 'foo'
     storage.getKeysForPath("fo") must beEmpty
   }
 

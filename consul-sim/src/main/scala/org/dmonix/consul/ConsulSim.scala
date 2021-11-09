@@ -115,10 +115,10 @@ class ConsulSim {
     */
   private[consul] val sessionRoute: Route =
     pathPrefix("v1" / "session") {
-      //create session
+      // create session
       pathPrefix("create") {
         put {
-          //easier to debug/trace logs with a sequential counter as sessionID generator
+          // easier to debug/trace logs with a sequential counter as sessionID generator
           val sessionID = sessionStorage.createSession()
           val rsp = s"""
                        |{
@@ -129,16 +129,16 @@ class ConsulSim {
           complete(HttpEntity(ContentTypes.`application/json`, rsp))
         }
       } ~
-        //destroy session
+        // destroy session
         pathPrefix("destroy" / Remaining) { sessionID =>
           sessionStorage.removeSession(sessionID).foreach(_ => logger.debug(s"Destroyed session [$sessionID]"))
           complete(HttpEntity(ContentTypes.`application/json`, "true"))
         } ~
-        //renew session
+        // renew session
         pathPrefix("renew" / Remaining) { sessionID =>
           sessionStorage.getSession(sessionID) match {
             case Some(session) =>
-              //FIXME update the session data
+              // FIXME update the session data
               logger.debug(s"Renewed session [$sessionID]")
               complete(HttpEntity(ContentTypes.`application/json`, session.toJson.prettyPrint))
             case None =>
@@ -155,16 +155,16 @@ class ConsulSim {
     */
   private[consul] val keyValueRoute: Route =
     pathPrefix("v1" / "kv" / Remaining) { key =>
-      //store kv
+      // store kv
       put {
         parameters('cas.?, 'acquire.?, 'release.?, 'flags.?) { (cas, acquire, release, flags) =>
           entity(as[Option[String]]) { entity =>
             (acquire, release) match {
-              case (Some(id1), Some(id2)) => //both acquire and release are provided => illegal
+              case (Some(id1), Some(id2)) => // both acquire and release are provided => illegal
                 complete(StatusCodes.BadRequest, s"Conflicting flags: acquire=$id1&release=$id2")
-              case (Some(id), None) if !sessionStorage.sessionExists(id) => //acquire session does not exist
+              case (Some(id), None) if !sessionStorage.sessionExists(id) => // acquire session does not exist
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
-              case (None, Some(id)) if !sessionStorage.sessionExists(id) => //release session does not exist
+              case (None, Some(id)) if !sessionStorage.sessionExists(id) => // release session does not exist
                 complete(StatusCodes.InternalServerError, s"invalid session '$id'")
               case _ =>
                 val newValue = entity.filterNot(_.isEmpty)
@@ -175,7 +175,7 @@ class ConsulSim {
           }
         }
       } ~
-        //read kv
+        // read kv
         get {
           parameters('index.?, 'wait.?, 'recurse.?) { (index, wait, recurse) =>
             val waitDuration = wait.map(_.asFiniteDuration).filterNot(_ == zeroDuration) getOrElse defaultDuration
@@ -184,25 +184,25 @@ class ConsulSim {
               s"Attempting to read [$key] with index [$modifyIndex] wait [$waitDuration] and recurse [$recurse]"
             )
             keyValueStorage.readKey(key, modifyIndex, waitDuration) match {
-              //non-recursive call return the found key
+              // non-recursive call return the found key
               case Some(kv) if recurse.isEmpty =>
                 logger.debug(s"Read data for [$key] [$kv]")
                 complete(HttpEntity(ContentTypes.`application/json`, Seq(kv).toJson.prettyPrint))
-              //recursive call, return all keys on the requested path
+              // recursive call, return all keys on the requested path
               case _ if recurse.isDefined =>
                 val res = keyValueStorage.getKeysForPath(key)
                 logger.debug(s"Recursively read [$key] found [${res.size}] keys with [$res]")
                 complete(HttpEntity(ContentTypes.`application/json`, res.toJson.prettyPrint))
-              //no such key
+              // no such key
               case _ =>
                 complete(StatusCodes.NotFound, s"No such key '$key'")
             }
           }
         } ~
-        //delete kv
+        // delete kv
         delete {
           parameters('cas.?, 'recurse.?) { (cas, recurse) =>
-            val recursive = recurse getOrElse false //TODO implement recursive delete
+            val recursive = recurse getOrElse false // TODO implement recursive delete
             keyValueStorage.removeKey(key)
             complete(HttpEntity(ContentTypes.`application/json`, "true"))
           }
