@@ -59,11 +59,11 @@ object Implicits {
       * @return The mapped Option
       */
     def mapTo[T: JsonReader]: Option[T] = value
-      .filter(_ match { //The filter is to get rid of JsNull values
+      .filter(_ match { // The filter is to get rid of JsNull values
         case JsNull => false
         case _      => true
       })
-      .map(_.convertTo[T]) //convert to desired type
+      .map(_.convertTo[T]) // convert to desired type
   }
 
   /**
@@ -108,7 +108,7 @@ object Implicits {
 
   implicit class RichTry(t: Try[String]) {
     def asJson: Try[JsValue] = t.map(JsonParser(_))
-    def mapTo[T: JsonReader](): T = asJson.map(_.convertTo[T]) match { //convert to desired type
+    def mapTo[T: JsonReader](): T = asJson.map(_.convertTo[T]) match { // convert to desired type
       case Success(x)  => x
       case Failure(ex) => throw ex
     }
@@ -127,7 +127,7 @@ object Implicits {
       * @return String with the params, empty string if empty list or all items are None
       */
     def asURLParams: String = map.collect { case (key, Some(value)) => key + "=" + value } match {
-      case Nil => "" //empty seq => empty string, .mkstring would else always add '?' even if the seq is empty
+      case Nil => "" // empty seq => empty string, .mkstring would else always add '?' even if the seq is empty
       case seq => seq.mkString("?", "&", "")
     }
   }

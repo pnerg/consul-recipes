@@ -26,7 +26,7 @@ trait MockResponses {
   import ConsulJsonProtocol._
 
   def failureResponse = Failure(new IOException(s"Got unexpected response [666][Shit hit the fan"))
-  def getKVResponse(data: Option[String] = None) = ??? //Success(new KeyValue())
+  def getKVResponse(data: Option[String] = None) = ??? // Success(new KeyValue())
   def trueResponse = Success("true")
   def falseResponse = Success("false")
   def sessionCreatedJson(sessionID: String = "12345") = s"""

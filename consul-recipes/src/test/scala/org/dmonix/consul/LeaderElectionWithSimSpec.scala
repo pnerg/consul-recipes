@@ -35,18 +35,18 @@ class LeaderElectionWithSimSpec extends Specification with BeforeAfterAll with E
     lazy val candidate1 = joinCandidate(groupName, observer1)
     lazy val candidate2 = joinCandidate(groupName, observer2)
     try {
-      //candidate 1 joined first and should be elected
-      //candidate 2 should NOT be elected
+      // candidate 1 joined first and should be elected
+      // candidate 2 should NOT be elected
       candidate1.isLeader must beTrue.eventually
       observer1.isElected must beTrue.eventually
       candidate2.isLeader must beFalse.eventually
       observer2.isElected must beFalse.eventually
 
-      //drop the leader, force a re-election
+      // drop the leader, force a re-election
       candidate1.leave()
 
-      //now candidate 1 should have released leadership
-      //and candidate 2 should have become leader
+      // now candidate 1 should have released leadership
+      // and candidate 2 should have become leader
       candidate1.isLeader must beFalse.eventually
       observer1.isElected must beFalse.eventually
       candidate2.isLeader must beTrue.eventually

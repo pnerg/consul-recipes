@@ -35,9 +35,9 @@ object Semaphore {
       holderFiles: Stream[KeyValue]
   ) {
     def staleMemberFiles: Stream[KeyValue] =
-      holderFiles.filter(_.session.isEmpty) //all member/session files without an owner
+      holderFiles.filter(_.session.isEmpty) // all member/session files without an owner
     def validMemberFiles: Stream[KeyValue] =
-      holderFiles.filter(_.session.isDefined) //all member/session files with an owner
+      holderFiles.filter(_.session.isDefined) // all member/session files with an owner
     def validHolderIDs: Set[SessionID] = validMemberFiles.map(_.session).flatten.toSet
     def isHolder(sessionID: SessionID): Boolean = validHolderIDs.contains(sessionID)
   }
@@ -122,17 +122,17 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
           _ <- Try(consul.unregisterSession(sessionID))
           aggregatedData <- readSemaphoreInfo()
         } yield {
-          //only allowed to release if owner/holder of a permit
+          // only allowed to release if owner/holder of a permit
           if (aggregatedData.semaphoreData.isHolder(sessionID)) {
-            //attempt to write back lock data with the added permits
+            // attempt to write back lock data with the added permits
             val newData = aggregatedData.semaphoreData.removeHolder(sessionID)
             storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
               .flatMap {
-                //lock successfully updated
+                // lock successfully updated
                 case true =>
                   logger.debug(s"[$sessionID] successfully released permit for [$semaphoreName]")
                   Success(true)
-                //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
+                // failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
                 case false =>
                   logger.debug(
                     s"[$sessionID] failed to release permit for [$semaphoreName] due to concurrent write, will try again"
@@ -140,11 +140,11 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
                   release()
               }
           }
-          //not an owner/holder of a permit
+          // not an owner/holder of a permit
           else
             Success(false)
         }).flatten
-      //don't even have a session, cannot be permit holder
+      // don't even have a session, cannot be permit holder
       case None => Success(false)
     }
   }
@@ -182,14 +182,14 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
     * @return ''Success'' if managed to access Consul, then true if a permit was acquired.
     */
   def tryAcquire(deadline: Deadline): Try[Boolean] = {
-    //there's still time left to do attempts
+    // there's still time left to do attempts
     if (deadline.hasTimeLeft()) {
       tryAcquireInternal().flatMap {
-        //got the lock, return
+        // got the lock, return
         case (true, _) =>
           Success(true)
-        //did not get the lock, block on the lock file and try again
-        //the readLockData returns if the lockData file has changed or the waitTime expires
+        // did not get the lock, block on the lock file and try again
+        // the readLockData returns if the lockData file has changed or the waitTime expires
         case (false, aggregatedData) if deadline.hasTimeLeft() =>
           logger.debug(
             s"No permits left for [$semaphoreName], will block on index [${aggregatedData.semaphoreKeyFile.modifyIndex + 1}] for max [${deadline.timeLeft}] waiting for an update"
@@ -197,13 +197,13 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
           readSemaphoreInfo(aggregatedData.semaphoreKeyFile.modifyIndex + 1, deadline.timeLeft).flatMap { _ =>
             tryAcquire(deadline)
           }
-        //didn't get lock and we're passed the deadline, bail out
+        // didn't get lock and we're passed the deadline, bail out
         case (false, _) =>
           logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
           Success(false)
       }
     }
-    //we've reached the max wait time, bail out
+    // we've reached the max wait time, bail out
     else {
       logger.debug(s"Failed to acquire permit for [$semaphoreName] within the required time frame")
       Success(false)
@@ -213,29 +213,29 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
   private def tryAcquireInternal(): Try[(Boolean, AggregatedData)] = {
     (for {
       sessionID <- getOrCreateSession()
-      rawData <- readSemaphoreInfo() //try to read the lock data
-      aggregatedData <- pruneStaleHolders(rawData) //prune any potential holders and return a mutated AggregatedData
+      rawData <- readSemaphoreInfo() // try to read the lock data
+      aggregatedData <- pruneStaleHolders(rawData) // prune any potential holders and return a mutated AggregatedData
     } yield {
       logger.debug(s"[$sessionID] read data for [$semaphoreName] current state is [${aggregatedData.semaphoreData}]")
-      //if already a holder, return true
+      // if already a holder, return true
       if (aggregatedData.isHolder(sessionID)) {
         logger.debug(s"[$sessionID] is already a holder of a permit for [$semaphoreName]")
         Success((true, aggregatedData))
       }
-      //if there's enough permits left, try to take one
+      // if there's enough permits left, try to take one
       else if (aggregatedData.semaphoreData.hasPermits()) {
-        //create new data ourselves as holder
+        // create new data ourselves as holder
         val newData = aggregatedData.semaphoreData.addHolder(sessionID)
-        //attempt to write the updated lock data
+        // attempt to write the updated lock data
         logger.debug(s"[$sessionID] attempts to acquire permit for [$semaphoreName] with updated data [$newData]")
         storeLockData(newData, aggregatedData.semaphoreKeyFile.modifyIndex)
           .flatMap {
-            //data written, we got the lock/semaphore
+            // data written, we got the lock/semaphore
             case true =>
               logger.debug(s"[$sessionID] successfully acquired permit for [$semaphoreName]")
-              writeOwnMemberFile(sessionID) //as we acquired the lock we must write our own member/lockholder file
-                .map(_ => (true, aggregatedData)) //map/return the result of the permit acquire
-            //failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
+              writeOwnMemberFile(sessionID) // as we acquired the lock we must write our own member/lockholder file
+                .map(_ => (true, aggregatedData)) // map/return the result of the permit acquire
+            // failed to write, this is due to concurrent updates and the provided 'ModifyIndex' did not match, let's try again
             case false =>
               logger.debug(
                 s"[$sessionID] failed to write lock data for [$semaphoreName] due to concurrent changes, will try again"
@@ -243,7 +243,7 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
               tryAcquireInternal()
           }
       }
-      //not enough permits left, bail out
+      // not enough permits left, bail out
       else {
         logger.debug(s"[$sessionID] could not acquire permit to [$semaphoreName] due to lack of permits")
         Success((false, aggregatedData))
@@ -256,10 +256,10 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
     consul
       .storeKeyValue(
         SetKeyValue(key = memberFile(sessionID), acquire = Some(sessionID))
-      ) //attempt to write own 'member' file
+      ) // attempt to write own 'member' file
       .flatMap {
         case true => Success(())
-        //should really not happen as we use our own sessionID as key
+        // should really not happen as we use our own sessionID as key
         case false =>
           Failure(
             new IllegalStateException(
@@ -293,7 +293,7 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
             case Some(data) => Success(AggregatedData(kv, data, memberFiles))
             case None       => Failure(new IllegalStateException(s"The data for path [$permitFile] has been erased"))
           }
-        //the data for the semaphore has been deleted, could be due to invoking "destroy", just bail out
+        // the data for the semaphore has been deleted, could be due to invoking "destroy", just bail out
         case None => Failure(SemaphoreDestroyed(semaphoreName))
       }
     }).flatten
@@ -328,14 +328,14 @@ class Semaphore(consul: Consul with SessionUpdater, semaphoreName: String) {
     * @return
     */
   private def pruneStaleHolders(aggregatedData: AggregatedData): Try[AggregatedData] = {
-    //any member file without owner is a sign of a session that has died and orphaned the file, nuke it
+    // any member file without owner is a sign of a session that has died and orphaned the file, nuke it
     aggregatedData.staleMemberFiles.foreach { kv =>
       logger.warn(
         s"Found member file [${kv.key}] without owner for [$semaphoreName], this is the mark of a dead session will delete it"
       )
       consul.deleteKeyValue(kv.key)
     }
-    //set the valid holders
+    // set the valid holders
     val newSemData = aggregatedData.semaphoreData.copy(holders = aggregatedData.validHolderIDs)
     Success(aggregatedData.copy(semaphoreData = newSemData))
   }

@@ -13,15 +13,15 @@ object SonatypeSettings extends AutoPlugin {
   override def requires: Plugins = plugins.JvmPlugin && Sonatype
 
   object autoImport extends SonatypeKeys
-  
+
   import autoImport._
-  
+
   private val projectName = "consul-recipes"
 
   override lazy val projectSettings = Seq(
     startYear := Some(2018),
     publishTo := sonatypePublishTo.value,
-    publishMavenStyle := true,  
+    publishMavenStyle := true,
     licenses := Seq("APL2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
     sonatypeProjectHosting := Some(GitHubHosting("pnerg", projectName, "")),
     homepage := Some(url(s"https://github.com/pnerg/$projectName")),
@@ -32,7 +32,7 @@ object SonatypeSettings extends AutoPlugin {
       )
     ),
     developers := List(
-      Developer(id="pnerg", name="Peter Nerg", email="", url=url("https://github.com/pnerg"))
+      Developer(id = "pnerg", name = "Peter Nerg", email = "", url = url("https://github.com/pnerg"))
     )
   )
 }

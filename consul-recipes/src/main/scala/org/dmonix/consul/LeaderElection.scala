@@ -122,7 +122,7 @@ private class CandidateImpl(
 
   private val waitDuration = 60.seconds
   @volatile private var isActive: AtomicBoolean = new AtomicBoolean(true)
-  @volatile private var isLeaderState = attemptToTakeLeadership() //immediately try to cease leadership
+  @volatile private var isLeaderState = attemptToTakeLeadership() // immediately try to cease leadership
   @volatile private var modifyIndex = 0
 
   logger.info(
@@ -137,8 +137,8 @@ private class CandidateImpl(
     if (isActive.compareAndSet(true, false)) {
       consul.storeKeyValue(
         setKey.copy(acquire = None, release = Option(sessionID), value = None)
-      ) //release the ownership, we do this even if we don't own the key doesn't matter
-      consul.destroySession(sessionID) //delete our session
+      ) // release the ownership, we do this even if we don't own the key doesn't matter
+      consul.destroySession(sessionID) // delete our session
       consul.unregisterSession(sessionID)
       if (isLeaderState)
         notifyUnElected()
@@ -149,27 +149,27 @@ private class CandidateImpl(
 
   private def attemptToTakeLeadership(): Boolean = {
     consul.storeKeyValue(setKey) match {
-      case Success(true) if !isLeader => //acquired leadership
+      case Success(true) if !isLeader => // acquired leadership
         notifyElected()
         true
-      case Success(false) if isLeader => //lost leadership
+      case Success(false) if isLeader => // lost leadership
         notifyUnElected()
         false
-      case Success(newLeaderState) => //unchanged state
+      case Success(newLeaderState) => // unchanged state
         newLeaderState
-      case _ => //failed to access Consul
+      case _ => // failed to access Consul
         false
     }
   }
 
   private def notifyElected(): Unit = {
     logger.info(s"Session [$sessionID] has acquired leadership in group [$groupName]")
-    observer.foreach(o => Future(o.elected())) //run the notification in own future not to block
+    observer.foreach(o => Future(o.elected())) // run the notification in own future not to block
   }
 
   private def notifyUnElected(): Unit = {
     logger.info(s"Session [$sessionID] has lost leadership in group [$groupName]")
-    observer.foreach(o => Future(o.unElected())) //run the notification in own future not to block
+    observer.foreach(o => Future(o.unElected())) // run the notification in own future not to block
   }
 
   private class ElectionUpdater extends Runnable {
@@ -177,37 +177,37 @@ private class CandidateImpl(
     override def run(): Unit = {
       while (isActive.get()) {
         consul.readKeyValueWhenChanged(setKey.key, modifyIndex + 1, waitDuration) match {
-          //result is irrelevant if we're no longer active, just ignore and exit
+          // result is irrelevant if we're no longer active, just ignore and exit
           case _ if !isActive.get() => ()
 
           case Success(Some(keyValue)) =>
-            pauseOnFailure = DefaultPause //reset the pause duration
+            pauseOnFailure = DefaultPause // reset the pause duration
             modifyIndex = keyValue.modifyIndex
             logger.debug(
               s"Session [$sessionID] has read updated election data [$keyValue] and is in leader state [$isLeaderState]"
             )
             keyValue.session match {
-              //election node has no owner, fight for ownership
-              //current owner yielded or the owning session was terminated
+              // election node has no owner, fight for ownership
+              // current owner yielded or the owning session was terminated
               case None =>
                 isLeaderState = attemptToTakeLeadership()
 
-              //we have become owner, notify of the change...this should really not be possible
+              // we have become owner, notify of the change...this should really not be possible
               case Some(ownerSession) if (ownerSession == sessionID) && !isLeader =>
                 notifyElected()
 
-              //we have lost ownership, notify of the change...a manual change in Consul can cause this
+              // we have lost ownership, notify of the change...a manual change in Consul can cause this
               case Some(ownerSession) if (ownerSession != sessionID) && isLeader =>
                 notifyUnElected()
 
-              //no change to owner state, just ignore
+              // no change to owner state, just ignore
               case _ =>
             }
-          case Success(None) => //got no data, file has been removed
-            //FIXME what to do in case the key is removed
-            pauseOnFailure = DefaultPause //reset the pause duration
+          case Success(None) => // got no data, file has been removed
+            // FIXME what to do in case the key is removed
+            pauseOnFailure = DefaultPause // reset the pause duration
             isLeaderState = attemptToTakeLeadership()
-          //future/try failed...do a new get on the key again
+          // future/try failed...do a new get on the key again
           case Failure(ex) =>
             logger.warn(
               s"Session [$sessionID] in group [$groupName] failed to read election state due to [${ex.getMessage}], will wait [$pauseOnFailure] before attempting again"
