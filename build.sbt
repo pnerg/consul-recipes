@@ -7,8 +7,8 @@ version := componentVersion
 val baseSettings = Seq(
   organization := "org.dmonix",
   version := componentVersion,
-  scalaVersion := "2.13.4",
-  crossScalaVersions := Seq("2.11.12", "2.12.15", "2.13.4"),
+  scalaVersion := "2.13.7",
+  crossScalaVersions := Seq("2.11.12", "2.12.15", "2.13.7"),
   scalacOptions := Seq(
     "-feature",
     "-language:postfixOps",
