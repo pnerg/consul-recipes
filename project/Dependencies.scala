@@ -6,8 +6,8 @@ object Dependencies extends AutoPlugin {
     val `spray-json` = "io.spray" %% "spray-json" % "1.3.6"
 
     val `slf4j-api` = "org.slf4j" % "slf4j-api" % "1.7.36"
-    val `logback-classic` = "ch.qos.logback" % "logback-classic" % "1.2.11"
-
+    val `logback-classic` = "ch.qos.logback" % "logback-classic" % "1.4.6"
+   
     val `specs-core-version` = "4.10.6"
     val `specs2-core` = "org.specs2" %% "specs2-core" % `specs-core-version`
     val `specs2-mock` = "org.specs2" %% "specs2-mock" % `specs-core-version`
