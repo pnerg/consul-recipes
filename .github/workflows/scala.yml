@@ -7,7 +7,7 @@ jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.3.0
+      - uses: actions/checkout@v3.5.3
       - name: Check Scala style
         run: sbt scalafmtCheckAll
       - name: Run cross-version tests for 2.11
@@ -23,6 +23,6 @@ jobs:
       - name: Generate coverage report
         run: sbt coverageReport
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.1.1
+        uses: codecov/codecov-action@v3.1.4
         with:
           fail_ci_if_error: true
